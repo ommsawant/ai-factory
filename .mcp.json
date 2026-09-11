@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "airjam": {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "airjam-mcp"
+      ]
+    }
+  }
+}

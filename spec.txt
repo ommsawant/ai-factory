@@ -1,0 +1,1524 @@
+AI FACTORY — BUILD • BREAK • SURVIVE
+Expo-Ready Product & Development Specification for Antigravity
+**Project type:** Real-time 5-player cooperative mobile-controller game  
+**Primary display:** One large host screen / TV / projector  
+**Player devices:** 5 mobile phones, browser-based  
+**Framework:** Air Jam  
+**Frontend:** React + TypeScript + Vite  
+**Styling:** Tailwind CSS  
+**Game objective:** Five engineers operate different departments of one AI Factory and collectively deploy a healthy AI system before the timer ends.
+---
+1. Executive Summary
+Build a polished, expo-ready multiplayer game called **AI Factory — Build • Break • Survive**.
+The experience is designed for an office technology expo themed around:
+**“AI is Engineering & Engineering is AI.”**
+Five visitors join a shared game by scanning a QR code displayed on the host screen. Each visitor is assigned one engineering role. Every role receives a completely different mini-game on their own phone. The five mini-games run concurrently and contribute to a single shared factory state.
+The big screen does not display the phone games. It displays a visually rich AI Factory with five departments, live progress meters, alerts, animations, the central AI Core, a countdown timer, Factory Health, and the final team result.
+The game should feel like a **cooperative engineering mission**, not a quiz.
+The five roles and mini-games are:
+1. **Power Engineer → Tap-Tap Power**
+2. **Data Engineer → Data Cleaning / Sorting**
+3. **Security Engineer → Zip-Zap Firewall**
+4. **AI Model Engineer → AI Core Puzzle**
+5. **Cooling Engineer → Gyro Temperature Control**
+At the end of the session, the five department results are combined into:
+Department completion
+Factory Health
+Team Score
+AI deployment status
+If the factory reaches the required success conditions, the final screen announces:
+**AI FACTORY ONLINE — AI SUCCESSFULLY DEPLOYED**
+Otherwise:
+**AI FACTORY FAILED — AI DEPLOYMENT UNSUCCESSFUL**
+---
+2. Product Principles
+2.1 Five people, one system
+Each player should feel responsible for one real part of the factory.
+No player should feel like they are independently playing a generic arcade game.
+2.2 Immediate cause and effect
+When a player performs an action on their phone, the big screen must visibly react.
+Examples:
+Power tapping increases factory energy.
+Data sorting increases data cleanliness.
+Zip-Zap blocks an attack and strengthens the firewall.
+Solving the AI puzzle improves the AI Core.
+Tilting the phone stabilizes temperature.
+2.3 Spectator readability
+A person walking past the booth should understand the game in approximately 5–10 seconds:
+“Five people are controlling five parts of an AI Factory. They have to keep it alive and deploy the AI.”
+The big screen must therefore prioritize:
+Factory visualization
+Department status
+Large progress meters
+Alerts
+Animated feedback
+Countdown
+Factory Health
+Final success/failure
+2.4 Low friction
+Players should not install an app.
+Expected flow:
+Scan QR → open browser → enter/join → receive role → play
+2.5 Short session
+Target session length:
+2–3 minutes
+The game should be understandable immediately and replayable many times during an expo.
+---
+3. High-Level Architecture
+┌───────────────────────────┐
+│       HOST SCREEN         │
+│                           │
+│       AI FACTORY         │
+│  Departments + AI Core   │
+│  Alerts + Timer + Score  │
+└─────────────┬─────────────┘
+│
+Air Jam Host Runtime
+│
+Shared Authoritative State
+│
+┌─────────────┴─────────────┐
+│        AIR JAM            │
+│ Room + QR + Networking    │
+│ Controller Input + Sync   │
+└─────────────┬─────────────┘
+│
+┌────────────────┬───────────┼───────────────┬────────────────┐
+│                │           │               │                │
+▼                ▼           ▼               ▼                ▼
+PHONE 1           PHONE 2     PHONE 3         PHONE 4          PHONE 5
+POWER              DATA      SECURITY          MODEL            COOLING
+│                │           │               │                │
+Tap-Tap            Sort      Zip-Zap          Puzzle          Gyroscope
+---
+4. Air Jam's Role
+Air Jam should be treated as the **multiplayer game infrastructure layer**, not as the game itself.
+The project owns:
+Mini-game logic
+Factory simulation
+Visual design
+Scoring
+Department progression
+Game events
+Success/failure rules
+Animations
+AI Factory theme
+Air Jam provides the foundation for:
+Host/controller architecture
+Player rooms
+QR joining
+Phone controllers
+Real-time input transport
+Shared state synchronization
+Host-authoritative actions
+Controller/host separation
+The implementation should use Air Jam's official SDK and current project scaffold rather than recreating WebSocket room infrastructure manually.
+Air Jam currently documents a React/TypeScript model with host and controller surfaces, a typed input schema, and a shared store with the host as source of truth.
+Official project bootstrap should be verified against the current Air Jam documentation before implementation because SDK APIs can change.
+---
+5. Core Game Flow
+START
+  │
+  ▼
+HOST CREATES SESSION
+  │
+  ▼
+QR CODE DISPLAYED
+  │
+  ▼
+PLAYERS SCAN
+  │
+  ▼
+PLAYER LOBBY
+  │
+  ├── Player 1 → Power
+  ├── Player 2 → Data
+  ├── Player 3 → Security
+  ├── Player 4 → AI Model
+  └── Player 5 → Cooling
+  │
+  ▼
+ALL FIVE READY
+  │
+  ▼
+COUNTDOWN
+  3 → 2 → 1 → GO!
+  │
+  ▼
+GAMEPLAY
+  │
+  ├── Power mini-game
+  ├── Data mini-game
+  ├── Security mini-game
+  ├── Model puzzle
+  └── Cooling gyro game
+  │
+  ▼
+SHARED FACTORY STATE UPDATES
+  │
+  ▼
+FACTORY EVENTS / WARNINGS
+  │
+  ▼
+TIMER ENDS
+  │
+  ▼
+FINAL EVALUATION
+  │
+  ├── SUCCESS → AI DEPLOYED
+  │
+  └── FAILURE → FACTORY FAILED
+---
+6. Host Screen Specification
+The host screen is the main visual attraction.
+6.1 Idle / attract mode
+Before players join:
+╔══════════════════════════════════════════════════════╗
+║                    🏭 AI FACTORY                     ║
+║                 BUILD • BREAK • SURVIVE              ║
+║                                                      ║
+║                 READY TO BUILD AI                    ║
+║                                                      ║
+║                    [ QR CODE ]                       ║
+║                                                      ║
+║                SCAN TO JOIN                          ║
+║                                                      ║
+║                  0 / 5 ENGINEERS                    ║
+╚══════════════════════════════════════════════════════╝
+The factory should be animated even while idle:
+moving data streams
+blinking indicators
+subtle machine movement
+pulsing AI Core
+ambient status lights
+6.2 Lobby
+AI FACTORY LOBBY
+ENGINEERS REQUIRED: 5
+✓ Power Engineer
+✓ Data Engineer
+✓ Security Engineer
+✓ AI Model Engineer
+✓ Cooling Engineer
+5 / 5 READY
+START GAME
+Do not allow accidental start until the required five roles are assigned.
+If fewer than five players are present, clearly show:
+Waiting for more engineers...
+6.3 Main gameplay screen
+The central visual hierarchy should be:
+1. AI Core
+2. Factory Health
+3. Five departments
+4. Current incident
+5. Countdown
+6. Team score
+Conceptual layout:
+AI FACTORY
+BUILD • BREAK • SURVIVE
+⚡ POWER                       💾 DATA
+┌──────────┐                 ┌──────────┐
+│ ████████ │                 │ ██████░░ │
+│   82%    │                 │   67%    │
+└────┬─────┘                 └────┬─────┘
+│                            │
+└──────────┐      ┌──────────┘
+▼      ▼
+┌────────────┐
+│  AI CORE   │
+│            │
+│   🤖 87%   │
+└────────────┘
+▲      ▲
+┌──────────┘      └──────────┐
+│                            │
+🛡 SECURITY                  🧠 MODEL
+┌──────────┐                 ┌──────────┐
+│ ███████░ │                 │ █████░░░ │
+│   91%    │                 │   54%    │
+└──────────┘                 └──────────┘
+🌡 COOLING
+┌──────────────┐
+│     74°C     │
+│   STABLE ✓   │
+└──────────────┘
+FACTORY HEALTH: ████████░░ 84%
+🚨 CURRENT EVENT: DATA CORRUPTION
+01:27
+---
+7. Department System
+Each department should have:
+Name
+Icon
+Progress percentage
+Current status
+Completion state
+Active/inactive visual treatment
+Short event/status message
+Suggested states:
+INACTIVE
+   ↓
+WORKING
+   ↓
+STABLE
+   ↓
+COMPLETE
+Failure/warning states:
+WARNING
+CRITICAL
+FAILED
+When a player is actively progressing their department, the corresponding department on the host should:
+glow/pulse
+show an activity animation
+update the meter
+display a short status message
+When complete:
+lock progress at 100%
+change to a strong completed visual
+show a check mark
+trigger a completion animation
+optionally send a positive factory-wide signal
+---
+8. Mini-Game 1 — Power Engineer
+Name
+TAP-TAP POWER
+Objective
+Build enough power to reach the required capacity before time runs out.
+Controller
+Large central button:
+POWER STORAGE
+42%
+█████░░░░░
+TARGET: 100%
+┌───────────┐
+│    ⚡     │
+│    TAP    │
+└───────────┘
+Every valid tap contributes to the power meter.
+Input model
+Use a discrete/pulse-style action because each tap matters individually.
+Do not depend on frame-perfect button polling.
+Difficulty options
+Possible progression:
+Early taps give normal energy.
+At high capacity, gains become slightly harder.
+Optional random “power surge” moments.
+Avoid excessive complexity in the first MVP.
+Completion
+At 100%:
+POWER ONLINE ✓
+The Power department becomes COMPLETE.
+Failure
+If the timer ends before the minimum required threshold:
+POWER INSUFFICIENT
+---
+9. Mini-Game 2 — Data Engineer
+Name
+DATA CLEANING
+Objective
+Sort incoming data entities into the correct categories.
+Example
+Phone receives a mixed stream:
+42   AI   7   ML   18   DL   91   AI
+The player drags each entity into its correct group.
+Example groups:
+┌──────────────┐     ┌──────────────┐
+│   NUMBERS    │     │   AI TERMS   │
+└──────────────┘     └──────────────┘
+The exact categories can be varied.
+Scoring
+Correct placement:
+increases data cleanliness
+adds team score
+Incorrect placement:
+does not increase progress
+optionally introduces a small penalty
+Host visualization
+💾 DATA PIPELINE
+CLEAN
+████████░░ 82%
+NOISE
+██░░░░░░░░ 18%
+As the player correctly sorts data, the pipeline should visibly become cleaner.
+At 100%:
+DATA PIPELINE CLEAN ✓
+---
+10. Mini-Game 3 — Security Engineer
+Name
+ZIP-ZAP FIREWALL
+Objective
+Defend the factory from a cyber attack by completing a Zip-Zap sequence.
+Phone
+Example:
+CYBER ATTACK
+FIREWALL: 45%
+SEQUENCE:
+ZIP → ZAP → ZIP → ZAP
+┌───────┐  ┌───────┐
+│  ZIP  │  │  ZAP  │
+└───────┘  └───────┘
+Sequences should become progressively more difficult.
+Correct action
+Firewall strength increases.
+Wrong action
+Threat level increases or firewall progress temporarily decreases.
+Host
+Show:
+🛡 SECURITY
+FIREWALL
+███████░░░ 70%
+THREAT LEVEL
+███░░░░░░░ 30%
+During attacks:
+show a visible warning
+animate an intrusion toward the AI Core
+allow the Security Engineer to visibly stop it
+Completion:
+FIREWALL ACTIVE ✓
+---
+11. Mini-Game 4 — AI Model Engineer
+Name
+AI CORE PUZZLE
+Keep this deliberately small.
+The player should solve one concise puzzle rather than play a complex game.
+Example puzzle
+Arrange an AI pipeline into the correct sequence:
+[ DEPLOY ]
+[ TRAIN ]
+[ DATA ]
+[ PREDICT ]
+Correct order:
+DATA → TRAIN → PREDICT → DEPLOY
+The exact puzzle can be replaced with another AI-themed logical puzzle if testing shows that it is more intuitive.
+Requirements
+The puzzle must:
+be understandable immediately
+take approximately 20–60 seconds
+reward correct reasoning
+have a clear success condition
+update the AI Core on success
+Host
+Before completion:
+🧠 AI CORE
+MODEL STATUS
+██████░░░░ 60%
+MODEL OPTIMIZATION REQUIRED
+After solving:
+🧠 AI CORE
+MODEL OPTIMIZED ✓
+██████████ 100%
+---
+12. Mini-Game 5 — Cooling Engineer
+Name
+GYRO TEMPERATURE CONTROL
+Objective
+Use the phone's physical tilt/orientation to bring the AI Core temperature into the safe target range and stabilize it.
+Phone
+AI CORE COOLING
+🔥 91°C
+SAFE ZONE
+70–75°C
+●
+│
+TILT PHONE
+Keep the
+temperature stable
+The device orientation controls cooling.
+Input
+Use the device orientation / gyroscope capabilities available in the mobile browser and supported by the selected runtime.
+Important implementation considerations:
+request motion/orientation permission when required
+handle unsupported devices gracefully
+provide a fallback touch control for devices without usable orientation data
+do not make the game impossible if browser permissions are denied
+Host
+🌡 COOLING
+TEMPERATURE
+91°C 🔥
+As the player adjusts:
+84°C
+↓
+79°C
+↓
+75°C
+↓
+74°C ✓
+At stable target:
+TEMPERATURE STABLE ✓
+---
+13. Shared Factory State
+The host/server must maintain the authoritative state.
+Conceptual model:
+FactoryState
+gamePhase
+timeRemaining
+power
+data
+security
+model
+cooling
+factoryHealth
+teamScore
+events
+departmentStatus
+winner / result
+Example:
+power: 82
+data: 76
+security: 91
+model: 68
+cooling: 88
+factoryHealth: 81
+teamScore: 3620
+timeRemaining: 74
+Controllers should not directly modify authoritative factory values.
+They send actions.
+The host applies validated actions.
+The host broadcasts resulting state.
+---
+14. State Flow
+PHONE ACTION
+│
+▼
+AIR JAM INPUT
+│
+▼
+HOST
+│
+├── Validate player
+├── Validate action
+├── Apply game rule
+├── Update department
+├── Update team score
+├── Recalculate factory health
+└── Trigger events
+│
+▼
+SHARED STATE
+│
+├───────────────┐
+▼               ▼
+HOST SCREEN       OTHER CONTROLLERS
+The host should remain the **source of truth**.
+---
+15. Factory Health
+Factory Health is the combined health of the five departments.
+Start with a simple transparent calculation.
+Example:
+Factory Health =
+(
+Power
+  + Data
+  + Security
+  + Model
+  + Cooling
+) / 5
+This is only the initial MVP formula.
+The implementation should isolate the calculation in a single function so it can be tuned during playtesting.
+For example:
+calculateFactoryHealth(state)
+This allows later experimentation with:
+weighted departments
+critical failures
+interdependencies
+event penalties
+bonuses
+completion thresholds
+without rewriting the mini-games.
+---
+16. Team Score
+Team Score should reward:
+Correct actions
+Speed
+Completion
+Avoiding mistakes
+Recovering from incidents
+Avoid making the scoring so complicated that players cannot understand why they won.
+Suggested structure:
+Department Score
++
+Speed Bonus
++
+Accuracy Bonus
++
+Recovery Bonus
+=
+Team Score
+The final screen should show both:
+overall team score
+department contributions
+---
+17. Factory Events
+Events should create urgency and teamwork.
+Examples:
+Power event
+⚡ POWER SURGE  
+Stabilize the power grid!
+Data event
+💾 DATA CORRUPTION  
+Incoming data contaminated!
+Security event
+🛡️ CYBER ATTACK  
+Firewall under attack!
+Model event
+🧠 MODEL DRIFT  
+AI accuracy dropping!
+Cooling event
+🔥 CRITICAL TEMPERATURE  
+AI Core overheating!
+Events should be optional/configurable and should not overwhelm the five core mini-games.
+The first implementation can use a small fixed event set.
+---
+18. Final Evaluation
+At timer completion:
+IF
+  all critical departments meet minimum thresholds
+  AND
+  factoryHealth >= successThreshold
+THEN
+  SUCCESS
+ELSE
+  FAILURE
+Example:
+Factory Health >= 70%
+AND
+No critical department below 40%
+These values should be configuration constants, not hardcoded throughout the application.
+---
+19. Final Success Screen
+Use a strong visual transition.
+ALL SYSTEMS READY
+⚡ POWER       ✓
+💾 DATA        ✓
+🛡 SECURITY    ✓
+🧠 AI CORE     ✓
+🌡 COOLING     ✓
+AI CORE
+↓
+DEPLOYING
+↓
+██████████
+Then:
+╔══════════════════════════════════════╗
+║                                      ║
+║       🏭 AI FACTORY ONLINE           ║
+║                                      ║
+║       AI SUCCESSFULLY DEPLOYED       ║
+║                                      ║
+║       FACTORY HEALTH: 89%            ║
+║                                      ║
+║       TEAM SCORE: 4,480              ║
+║                                      ║
+║       POWER       100%               ║
+║       DATA         92%               ║
+║       SECURITY     96%               ║
+║       AI CORE      84%               ║
+║       COOLING      91%               ║
+║                                      ║
+║          🟢 SUCCESS                  ║
+╚══════════════════════════════════════╝
+---
+20. Final Failure Screen
+╔══════════════════════════════════════╗
+║                                      ║
+║       🚨 AI FACTORY FAILED           ║
+║                                      ║
+║       AI DEPLOYMENT FAILED           ║
+║                                      ║
+║       FACTORY HEALTH: 43%            ║
+║                                      ║
+║       POWER       52%                ║
+║       DATA        31%                ║
+║       SECURITY    71%                ║
+║       AI CORE     38%                ║
+║       COOLING     55%                ║
+║                                      ║
+║       SYSTEMS NOT READY              ║
+╚══════════════════════════════════════╝
+Allow the host to quickly reset and start another round.
+---
+21. Player UX
+Every player phone should have:
+role title
+one-line objective
+large primary interaction
+progress
+feedback
+completion state
+Avoid:
+long instructions
+paragraphs of text
+tiny buttons
+unnecessary menus
+account creation
+app installation
+The player should understand their task almost instantly.
+---
+22. Accessibility and Expo Reliability
+Because this is an expo environment, reliability is more important than feature count.
+Implement:
+touch-friendly controls
+large buttons
+high contrast
+clear success/failure feedback
+responsive phone layouts
+landscape/portrait handling where appropriate
+fallback for unsupported gyroscope
+reconnect handling
+player disconnect handling
+host reset
+pause/resume if needed
+no permanent dependence on a single player's phone
+clear error state if networking is interrupted
+---
+23. Player Disconnect / Reconnect
+If a player disconnects:
+PLAYER DISCONNECTED
+⚡ Power Engineer
+Waiting for reconnection...
+The game should not crash.
+If the player reconnects during the same session, restore their role and continue if technically supported by the Air Jam runtime.
+If not possible, provide a host-side recovery mechanism.
+---
+24. Game Configuration
+Keep gameplay tuning in a central configuration object.
+Example:
+GAME_CONFIG
+maxPlayers = 5
+gameDuration = 180
+powerTarget = 100
+dataTarget = 100
+securityTarget = 100
+modelTarget = 100
+coolingSafeMin = 70
+coolingSafeMax = 75
+factorySuccessThreshold = 70
+Do not scatter these values across components.
+---
+25. Suggested Project Structure
+Use a structure similar to:
+ai-factory/
+│
+├── src/
+│   ├── airjam.config.ts
+│   │
+│   ├── game/
+│   │   ├── contracts/
+│   │   │   ├── input.ts
+│   │   │   └── state.ts
+│   │   │
+│   │   ├── store/
+│   │   │   └── factoryStore.ts
+│   │   │
+│   │   ├── config/
+│   │   │   └── gameConfig.ts
+│   │   │
+│   │   ├── logic/
+│   │   │   ├── factoryHealth.ts
+│   │   │   ├── scoring.ts
+│   │   │   ├── events.ts
+│   │   │   └── gameLifecycle.ts
+│   │   │
+│   │   └── roles/
+│   │       ├── power/
+│   │       ├── data/
+│   │       ├── security/
+│   │       ├── model/
+│   │       └── cooling/
+│   │
+│   ├── host/
+│   │   ├── HostApp.tsx
+│   │   ├── FactoryView.tsx
+│   │   ├── DepartmentCard.tsx
+│   │   ├── AICore.tsx
+│   │   ├── FactoryHealth.tsx
+│   │   ├── EventBanner.tsx
+│   │   ├── Timer.tsx
+│   │   └── FinalResult.tsx
+│   │
+│   ├── controller/
+│   │   ├── ControllerApp.tsx
+│   │   ├── Lobby.tsx
+│   │   ├── RoleAssignment.tsx
+│   │   └── games/
+│   │       ├── PowerGame.tsx
+│   │       ├── DataCleaningGame.tsx
+│   │       ├── SecurityGame.tsx
+│   │       ├── ModelPuzzleGame.tsx
+│   │       └── CoolingGyroGame.tsx
+│   │
+│   └── assets/
+│
+├── public/
+├── docs/
+├── tests/
+├── package.json
+├── airjam.config.ts
+└── README.md
+The exact structure should be adapted to the scaffold generated by the current Air Jam version rather than forcing this structure if the framework has a better convention.
+---
+26. Implementation Phases
+Phase 1 — Air Jam proof of concept
+Goal:
+scaffold current Air Jam project
+run host
+connect one phone
+verify controller input
+verify shared state
+verify QR flow
+Do not build visual polish yet.
+Phase 2 — Five-player lobby
+Implement:
+session
+QR
+player count
+role assignment
+five-player readiness
+start button
+disconnect handling
+Phase 3 — Power vertical slice
+Build the complete Power game:
+Phone tap
+→ Air Jam input
+→ host action
+→ power state
+→ factory meter
+→ completion
+→ score
+This becomes the reference implementation.
+Phase 4 — Remaining four games
+Implement:
+1. Data Cleaning
+2. Zip-Zap Security
+3. AI Core Puzzle
+4. Gyro Cooling
+Phase 5 — Shared factory simulation
+Implement:
+department state
+Factory Health
+Team Score
+timer
+events
+success/failure logic
+Phase 6 — Visual polish
+Add:
+factory artwork
+animations
+glowing departments
+AI Core animation
+alerts
+transitions
+sound effects
+completion effects
+Phase 7 — Expo testing
+Test:
+five different phones
+different browsers
+different screen sizes
+weak Wi-Fi
+reconnect
+simultaneous inputs
+rapid taps
+orientation permission
+host reset
+repeated sessions
+10+ consecutive games
+---
+27. Testing Strategy
+Unit tests
+Test:
+power scoring
+data classification
+Zip-Zap validation
+model puzzle validation
+cooling calculations
+Factory Health
+Team Score
+win/failure conditions
+Multiplayer tests
+Test:
+5 players connected
+5 simultaneous inputs
+rapid input
+incorrect input
+player disconnect
+player reconnect
+timer expiration
+host reset
+Real-device tests
+The gyro game MUST be tested on actual phones.
+Do not rely only on desktop browser emulation.
+---
+28. Expo Performance Requirements
+Target:
+smooth host animation
+immediate input response
+no visible lag during normal Wi-Fi conditions
+no full-page reload during gameplay
+session reset in seconds
+stable repeated sessions
+Keep the game lightweight.
+Do not introduce unnecessary backend services for the MVP.
+---
+29. Visual Direction
+The visual language should communicate:
+AI + Engineering + Industrial + Futuristic
+Suggested aesthetic:
+futuristic factory
+industrial control-room elements
+AI Core at center
+glowing pipelines
+holographic dashboards
+warning indicators
+animated energy/data flows
+strong typography
+dark/futuristic presentation suitable for a large LED screen
+Avoid making it look like:
+a generic dashboard
+a school quiz
+a spreadsheet
+a basic web app
+The host should look like an actual **AI control room**.
+---
+30. Audio / Feedback
+Optional but highly recommended for expo engagement.
+Use short sound effects:
+tap/power charge
+data clean
+firewall block
+puzzle success
+cooling stabilized
+warning alarm
+countdown
+deployment
+victory/failure
+Keep sound effects short and non-annoying.
+Allow the host to mute audio.
+---
+31. AI Usage
+AI should enhance the game rather than make the basic multiplayer loop dependent on an LLM.
+The first version should work without an external AI API.
+Potential future AI features:
+generate factory incidents
+dynamically vary challenge difficulty
+generate different data sets
+generate model puzzles
+create final AI Factory report
+generate a humorous engineering diagnosis after failure
+generate personalized “how your team built the AI” feedback
+These should be isolated behind a service/module so the game remains playable if an AI API is unavailable.
+---
+32. Security / Trust Model
+Because this is a multiplayer game, do not trust controller-submitted scores.
+Controllers should send:
+“I performed action X.”
+The host determines:
+“Action X is valid and therefore gives Y points.”
+Never allow the controller to directly submit:
+score = 10000
+power = 100
+The host-authoritative model should remain the source of truth.
+---
+33. Definition of Done
+The project is considered MVP-complete when:
+Host can start a session.
+QR code is visible.
+Five players can join.
+Five roles are assigned.
+Each phone shows a different mini-game.
+Power game works.
+Data Cleaning game works.
+Zip-Zap game works.
+AI Core puzzle works.
+Gyro game works.
+Player actions update the host in real time.
+Each department has a live progress meter.
+Factory Health updates.
+Team Score updates.
+Timer works.
+Final success/failure screen works.
+Host can reset the session.
+Repeated sessions work reliably.
+Game works on real phones.
+No player installation is required.
+The UI is expo-presentable.
+---
+34. Antigravity Development Rules
+The coding agent must follow these principles:
+1. **Do not rebuild Air Jam networking from scratch.**
+2. Inspect the installed/current Air Jam scaffold before changing architecture.
+3. Follow the current Air Jam SDK conventions.
+4. Keep host and controller responsibilities separate.
+5. Keep the host authoritative for shared state.
+6. Use typed contracts for controller input.
+7. Keep game logic separate from UI.
+8. Keep all gameplay constants configurable.
+9. Build one working vertical slice before implementing all five games.
+10. Never sacrifice reliability for visual effects.
+11. Test every important interaction on a real mobile device.
+12. Do not add external dependencies unless they solve a concrete requirement.
+13. Do not introduce FastAPI, PostgreSQL, Redis, or an external AI service unless the implementation actually requires them.
+14. Preserve a clean, modular architecture so individual mini-games can be modified independently.
+15. Make the final UI polished enough for a public expo.
+---
+35. Recommended Build Order
+The coding agent should work in this order:
+AIR JAM SCAFFOLD
+↓
+HOST + CONTROLLER CONNECTION
+↓
+FIVE-PLAYER LOBBY
+↓
+SHARED STATE
+↓
+POWER GAME
+↓
+HOST FACTORY VISUALIZATION
+↓
+DATA GAME
+↓
+SECURITY GAME
+↓
+MODEL PUZZLE
+↓
+COOLING GYRO
+↓
+FACTORY HEALTH
+↓
+SCORING
+↓
+EVENTS
+↓
+SUCCESS / FAILURE
+↓
+ANIMATION + AUDIO
+↓
+REAL DEVICE TESTING
+↓
+EXPO BUILD
+Do not attempt to build everything in one huge implementation pass.
+---
+36. MASTER ANTIGRAVITY PROMPT
+Use the following prompt as the primary project instruction for Antigravity.
+---
+PROMPT START
+You are the lead full-stack game engineer responsible for building an expo-ready real-time multiplayer web game called:
+AI FACTORY — BUILD • BREAK • SURVIVE
+The game is designed for a technology expo with the theme:
+“AI is Engineering & Engineering is AI.”
+The game must support exactly **five active players as a team**.
+Each player uses their own phone browser. A computer/TV/projector acts as the host screen.
+The five phones must display five DIFFERENT mini-games simultaneously.
+The host screen must NOT display the five mini-games. It must display one shared visual AI Factory whose departments react to the players' actions.
+---
+TECHNICAL FOUNDATION
+Use **Air Jam** as the multiplayer game framework/infrastructure.
+Before coding:
+1. Inspect the current Air Jam scaffold and installed SDK.
+2. Read the available Air Jam documentation in the project.
+3. Determine the current supported APIs for:
+   - host
+   - controller
+   - QR joining
+   - input schema
+   - shared store
+   - player identity
+   - controller input
+   - lifecycle
+   - deployment
+4. Do not invent or assume deprecated APIs.
+5. Do not implement custom WebSocket room infrastructure if Air Jam already provides the required functionality.
+Use the current official Air Jam architecture and adapt the implementation to the actual installed version.
+Preferred application technologies:
+React
+TypeScript
+Vite
+Tailwind CSS
+Air Jam SDK
+Zod for typed input contracts
+Air Jam shared state/store
+Use other libraries only when necessary.
+Do NOT introduce FastAPI, Redis, PostgreSQL, or an external LLM API for the MVP unless a concrete implementation requirement makes one necessary.
+---
+GAME CONCEPT
+Five engineers are responsible for keeping an AI Factory operational.
+Roles:
+1. Power Engineer
+2. Data Engineer
+3. Security Engineer
+4. AI Model Engineer
+5. Cooling Engineer
+Each engineer has one different mini-game.
+The five mini-games collectively determine the health of the AI Factory.
+The experience should feel cooperative.
+The players should need to communicate with each other.
+The audience should be able to understand the factory state from the large screen.
+---
+FIVE MINI-GAMES
+1. POWER ENGINEER
+Mini-game:
+TAP-TAP POWER
+The player must repeatedly tap a large power button.
+Every valid tap increases the power meter.
+Target is configurable.
+Example:
+POWER 42%
+[ ⚡ TAP ⚡ ]
+Target: 100%
+When power reaches the required target:
+POWER ONLINE ✓
+Host department becomes complete.
+Use discrete/pulse-style controller input for taps so individual rapid taps are not lost.
+---
+2. DATA ENGINEER
+Mini-game:
+DATA CLEANING
+Display a mixed set of data entities.
+Example:
+42, AI, 7, ML, 18, DL, 91, AI
+The player must drag each entity into the correct group/category.
+Correct sorting increases Data Cleanliness.
+Incorrect sorting should not award progress and may apply a small penalty.
+At 100%:
+DATA PIPELINE CLEAN ✓
+Host should show a visually clean data pipeline.
+---
+3. SECURITY ENGINEER
+Mini-game:
+ZIP-ZAP FIREWALL
+The player must respond to a sequence of ZIP and ZAP actions.
+Example:
+ZIP → ZAP → ZIP → ZIP → ZAP
+Provide large touch buttons.
+Correct actions increase Firewall Strength.
+Incorrect actions increase Threat Level or reduce security progress.
+When complete:
+FIREWALL ACTIVE ✓
+The host should show a visible cyber-attack being blocked.
+---
+4. AI MODEL ENGINEER
+Mini-game:
+AI CORE PUZZLE
+This must remain a small puzzle.
+Do not turn it into a complicated game.
+Example:
+Arrange:
+DATA
+TRAIN
+PREDICT
+DEPLOY
+Correct order:
+DATA → TRAIN → PREDICT → DEPLOY
+The puzzle should be quick, intuitive, and AI-themed.
+When solved:
+AI CORE OPTIMIZED ✓
+Model/AI Core progress reaches its target.
+---
+5. COOLING ENGINEER
+Mini-game:
+GYRO TEMPERATURE CONTROL
+Use the phone's device orientation/gyroscope where supported.
+The phone tilt controls cooling/temperature.
+Target safe range:
+70–75°C
+Example:
+91°C → 84°C → 79°C → 75°C → 74°C
+The player must stabilize the temperature in the safe range.
+Implement mobile orientation permission handling.
+If orientation data is unavailable, provide a touch-based fallback so the game remains playable.
+When stable:
+TEMPERATURE STABLE ✓
+---
+HOST SCREEN
+The host screen is the main attraction.
+It should display a futuristic AI Factory.
+Central element:
+AI CORE
+Surrounding departments:
+POWER
+DATA
+SECURITY
+MODEL
+COOLING
+Each department has:
+progress meter
+percentage
+status
+animated activity
+warning state
+completion state
+Example:
+AI FACTORY
+POWER        ████████░░ 82%
+DATA         ██████░░░░ 67%
+SECURITY     █████████░ 91%
+AI CORE      █████░░░░░ 54%
+COOLING      ████████░░ 88%
+CENTER:
+AI CORE
+HEALTH 87%
+BOTTOM:
+FACTORY HEALTH: 84%
+TEAM SCORE: 3620
+TIME: 01:27
+Also show a prominent current event/alert.
+---
+HOST VISUAL BEHAVIOR
+The host visualization must react immediately to controller actions.
+Power tapping:
+power meter increases
+factory lights/energy flow react
+Data sorting:
+clean data visibly flows through pipeline
+corruption decreases
+Security:
+cyber threat animation appears
+successful Zip-Zap blocks threat
+firewall strengthens
+Model:
+AI Core shows processing
+model status improves
+Cooling:
+AI Core temperature visibly changes
+overheating warning disappears when stabilized
+Do not merely update numbers.
+Make the factory feel alive.
+---
+LOBBY
+Before starting:
+AI FACTORY
+5 ENGINEERS REQUIRED
+Power Engineer
+Data Engineer
+Security Engineer
+AI Model Engineer
+Cooling Engineer
+Display player connection status.
+Display QR code.
+Do not start until five players are ready unless a host override is deliberately implemented.
+Each player receives one unique role.
+No duplicate roles.
+---
+TIMER
+Target game duration:
+2–3 minutes.
+Use a central countdown.
+Example:
+03:00 → 02:59 → ...
+When timer reaches zero:
+Stop gameplay input.
+Evaluate factory.
+Show final result.
+---
+SHARED STATE
+Create a centralized authoritative FactoryState.
+Conceptually:
+gamePhase
+timeRemaining
+power
+data
+security
+model
+cooling
+factoryHealth
+teamScore
+departmentStatuses
+activeEvents
+finalResult
+The host is the source of truth.
+Controllers send actions.
+The host validates and applies actions.
+Controllers must never directly submit authoritative scores or percentages.
+---
+FACTORY HEALTH
+Initial formula:
+Factory Health =
+(Power + Data + Security + Model + Cooling) / 5
+Put this calculation in a dedicated function.
+Do not hardcode it into UI components.
+Make it easy to tune later.
+---
+TEAM SCORE
+Score should consider:
+correct actions
+speed
+accuracy
+completion
+recovery from incidents
+Keep the first implementation simple.
+Example:
+Department Score
++
+Speed Bonus
++
+Accuracy Bonus
++
+Recovery Bonus
+=
+Team Score
+---
+FACTORY EVENTS
+Introduce occasional events that create urgency.
+Examples:
+POWER SURGE
+DATA CORRUPTION
+CYBER ATTACK
+MODEL DRIFT
+CRITICAL TEMPERATURE
+Events should create teamwork but must not make the game confusing.
+Start with a small deterministic/fixed event set.
+Add randomness only after the core game is stable.
+---
+SUCCESS CONDITION
+At the end of the timer:
+If the factory meets the configured success threshold:
+AI FACTORY ONLINE
+AI SUCCESSFULLY DEPLOYED
+Otherwise:
+AI FACTORY FAILED
+AI DEPLOYMENT UNSUCCESSFUL
+Make success thresholds configurable.
+Suggested initial threshold:
+Factory Health >= 70%
+Also optionally require that no critical department falls below a configured minimum.
+---
+FINAL SCREEN
+Success:
+AI FACTORY ONLINE
+AI SUCCESSFULLY DEPLOYED
+Factory Health: XX%
+Team Score: XXXX
+Power: XX%
+Data: XX%
+Security: XX%
+AI Core: XX%
+Cooling: XX%
+SUCCESS
+Failure:
+AI FACTORY FAILED
+AI DEPLOYMENT UNSUCCESSFUL
+Factory Health: XX%
+Show department results and the major failure reason.
+---
+VISUAL DESIGN
+Create a high-quality futuristic industrial AI aesthetic.
+The host screen should look like an AI control room / factory.
+Use:
+dark futuristic surfaces
+glowing system indicators
+animated data streams
+energy flow
+AI Core animation
+industrial panels
+warning states
+progress rings/bars
+smooth transitions
+strong typography
+Do not make it look like a generic SaaS dashboard.
+Do not make it look like Kahoot.
+The game must be visually impressive when displayed on a large screen.
+---
+MOBILE UI
+Phone interfaces must be extremely simple.
+Every screen should contain:
+ROLE
+OBJECTIVE
+MAIN INTERACTION
+PROGRESS
+STATUS
+Use large controls.
+Avoid text-heavy instructions.
+The player should understand the task almost immediately.
+---
+RESPONSIVENESS
+The controller UI must work on common mobile browsers.
+Support:
+Android Chrome
+iPhone Safari where supported
+portrait mode
+responsive screen sizes
+For the gyro game:
+request permission if necessary
+explain permission briefly
+detect unsupported orientation
+provide a touch fallback
+---
+ERROR HANDLING
+The game must not crash when:
+a player disconnects
+a phone loses network temporarily
+orientation permission is denied
+a controller sends invalid input
+the host refreshes
+the timer ends
+a player reconnects
+Show friendly states.
+Provide host reset functionality.
+---
+ARCHITECTURE
+Separate:
+1. UI
+2. Controller input
+3. Game logic
+4. Shared state
+5. Scoring
+6. Factory health
+7. Event system
+8. Configuration
+Use reusable components.
+Do not put game logic directly inside large React components.
+---
+PROJECT STRUCTURE
+Create/adapt a structure similar to:
+src/
+  airjam.config.ts
+  game/
+contracts/
+store/
+config/
+logic/
+roles/
+power/
+data/
+security/
+model/
+cooling/
+  host/
+  controller/
+  assets/
+Do not fight the framework's scaffold. Follow Air Jam conventions if they differ.
+---
+DEVELOPMENT STRATEGY
+Build incrementally.
+FIRST:
+Get Air Jam running.
+SECOND:
+Host + one controller.
+THIRD:
+Five-player lobby.
+FOURTH:
+Shared state.
+FIFTH:
+Build Power mini-game completely.
+SIXTH:
+Connect Power game to host visualization.
+SEVENTH:
+Implement Data.
+EIGHTH:
+Implement Security.
+NINTH:
+Implement Model Puzzle.
+TENTH:
+Implement Cooling Gyro.
+ELEVENTH:
+Factory Health + Team Score.
+TWELFTH:
+Events.
+THIRTEENTH:
+Final success/failure screens.
+FOURTEENTH:
+Visual polish.
+FIFTEENTH:
+Real-device multiplayer testing.
+Do not implement all five mini-games simultaneously before verifying the architecture.
+---
+IMPORTANT AIR JAM REQUIREMENT
+Before implementing networking:
+Inspect the actual installed Air Jam package and generated scaffold.
+Identify:
+current host API
+current controller API
+current input schema API
+current shared-store API
+QR/join components
+player identity handling
+lifecycle APIs
+supported input behavior modes
+Use those APIs exactly as currently available.
+For inputs, choose semantics appropriately:
+Power tap → discrete/pulse action
+Security Zip/Zap → discrete/pulse action
+Model puzzle → discrete actions
+Data sorting → touch/drag state/actions
+Cooling → latest continuous orientation value
+Do not create an unnecessary custom networking layer.
+---
+QUALITY BAR
+The result must not look like a prototype assembled from default HTML components.
+It must feel like something that could actually be demonstrated at a professional technology expo.
+Prioritize:
+1. Reliability
+2. Responsiveness
+3. Clarity
+4. Visual polish
+5. Multiplayer synchronization
+6. Fun
+7. Replayability
+---
+IMPLEMENTATION DISCIPLINE
+Before writing large amounts of code:
+1. Inspect repository.
+2. Inspect package.json.
+3. Inspect Air Jam configuration.
+4. Inspect existing routes.
+5. Inspect starter game.
+6. Inspect available documentation.
+7. Create a concise implementation plan.
+8. Implement one milestone.
+9. Run/build/test.
+10. Fix issues.
+11. Only then continue.
+Do not blindly overwrite existing scaffold files.
+Do not invent dependencies.
+Do not silently replace Air Jam with another multiplayer architecture.
+---
+DELIVERABLES
+Produce:
+1. Working host screen
+2. Working controller screen
+3. Five-player lobby
+4. Five unique role interfaces
+5. Five working mini-games
+6. Shared factory state
+7. Live department visualization
+8. Factory Health
+9. Team Score
+10. Countdown
+11. Factory events
+12. Success screen
+13. Failure screen
+14. Host reset
+15. Responsive mobile UI
+16. Real-device testing instructions
+17. README with setup/run instructions
+18. Architecture documentation
+19. Configuration documentation
+---
+FIRST TASK
+Do NOT immediately build the entire game.
+Start by:
+1. Inspecting the current repository.
+2. Inspecting the Air Jam scaffold and SDK.
+3. Understanding how host/controller communication currently works.
+4. Running the starter game.
+5. Confirming that a phone can join the host through the provided QR flow.
+6. Creating a short implementation plan based on the actual scaffold.
+7. Implementing the first milestone: a working five-player lobby and shared game state.
+After that milestone is working, implement the Power Engineer vertical slice.
+At every stage, keep the project runnable.
+PROMPT END
+---
+37. Final Product Vision
+The finished experience should communicate one simple idea:
+FIVE ENGINEERS
+↓
+FIVE DIFFERENT
+CHALLENGES
+↓
+ONE AI FACTORY
+↓
+ONE TEAM RESULT
+↓
+AI DEPLOYED
+The player should walk away thinking:
+**“I wasn't answering questions about AI. I actually operated part of an AI system.”**
+That is the central experience the implementation should preserve.

@@ -1,0 +1,564 @@
+@import "tailwindcss";
+
+/* ─── AI Factory Design Tokens ──────────────────────────────────────────── */
+
+@theme {
+  /* Brand palette */
+  --color-factory-bg: #050a14;
+  --color-factory-surface: #0d1825;
+  --color-factory-panel: #0f2035;
+  --color-factory-border: rgba(56, 189, 248, 0.15);
+  --color-factory-glow: rgba(56, 189, 248, 0.4);
+
+  /* Department colours */
+  --color-dept-power: #facc15;
+  --color-dept-data: #60a5fa;
+  --color-dept-security: #34d399;
+  --color-dept-model: #c084fc;
+  --color-dept-cooling: #38bdf8;
+
+  /* Status colours */
+  --color-status-working: #60a5fa;
+  --color-status-stable: #34d399;
+  --color-status-complete: #4ade80;
+  --color-status-warning: #fb923c;
+  --color-status-critical: #f87171;
+  --color-status-failed: #ef4444;
+  --color-status-inactive: #4b5563;
+
+  /* Text */
+  --color-text-primary: #f0f9ff;
+  --color-text-muted: #64748b;
+  --color-text-accent: #38bdf8;
+
+  /* Shadows / glows */
+  --shadow-glow-power: 0 0 24px rgba(250, 204, 21, 0.4);
+  --shadow-glow-data: 0 0 24px rgba(96, 165, 250, 0.4);
+  --shadow-glow-security: 0 0 24px rgba(52, 211, 153, 0.4);
+  --shadow-glow-model: 0 0 24px rgba(192, 132, 252, 0.4);
+  --shadow-glow-cooling: 0 0 24px rgba(56, 189, 248, 0.4);
+
+  /* Typography */
+  --font-display: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+
+/* ─── Base ──────────────────────────────────────────────────────────────── */
+
+@layer base {
+  html, body, #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-factory-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input, textarea, select {
+    font: inherit;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ─── Semantic Utilities ────────────────────────────────────────────────── */
+
+@utility factory-panel {
+  background: var(--color-factory-panel);
+  border: 1px solid var(--color-factory-border);
+  border-radius: 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(56, 189, 248, 0.06);
+}
+
+@utility factory-surface {
+  background: var(--color-factory-surface);
+  border: 1px solid var(--color-factory-border);
+  border-radius: 0.5rem;
+}
+
+/* Animated scanning line — AI control-room aesthetic */
+@utility scan-line {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(56, 189, 248, 0.04) 50%,
+      transparent 100%
+    );
+    background-size: 100% 8px;
+    animation: scanlines 4s linear infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes scanlines {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Pulsing glow for active departments */
+@utility dept-pulse {
+  animation: dept-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes dept-glow {
+  from { opacity: 0.7; }
+  to   { opacity: 1; }
+}
+
+/* Touch-safe interactive controls on mobile */
+@utility ctrl-button {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+/* Progress bar fill animation */
+@utility progress-fill {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── New Expo Polish Animations ─────────────────────────────────────────── */
+
+/* AI Core slow spin for orbiting rings */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Critical health pulse — rapid red flash */
+@keyframes criticalPulse {
+  0%   { box-shadow: 0 0 20px #f8717144, 0 0 60px #f8717122; transform: scale(1); }
+  50%  { box-shadow: 0 0 50px #f87171cc, 0 0 100px #f8717166; transform: scale(1.03); }
+  100% { box-shadow: 0 0 20px #f8717144, 0 0 60px #f8717122; transform: scale(1); }
+}
+
+/* Screen-edge critical vignette */
+@keyframes criticalVignette {
+  0%   { opacity: 0.3; }
+  50%  { opacity: 0.65; }
+  100% { opacity: 0.3; }
+}
+
+/* Heat shimmer vignette — orange edges */
+@keyframes heatVignette {
+  0%   { opacity: 0.2; }
+  60%  { opacity: 0.5; }
+  100% { opacity: 0.2; }
+}
+
+/* Cyber glitch — horizontal RGB shift */
+@keyframes cyberGlitch {
+  0%   { clip-path: inset(0 0 95% 0); transform: translate(-4px, 0); opacity: 0.9; }
+  10%  { clip-path: inset(50% 0 30% 0); transform: translate(3px, 0); }
+  20%  { clip-path: inset(80% 0 5% 0);  transform: translate(-2px, 0); }
+  30%  { clip-path: inset(20% 0 60% 0); transform: translate(4px, 0); }
+  40%  { clip-path: inset(60% 0 10% 0); transform: translate(-3px, 0); }
+  50%  { clip-path: inset(10% 0 70% 0); transform: translate(2px, 0); }
+  60%  { clip-path: inset(40% 0 40% 0); transform: translate(-4px, 0); }
+  70%  { clip-path: inset(75% 0 15% 0); transform: translate(3px, 0); }
+  80%  { clip-path: inset(5% 0 85% 0);  transform: translate(-2px, 0); }
+  90%  { clip-path: inset(90% 0 2% 0);  transform: translate(4px, 0); }
+  100% { clip-path: inset(0 0 95% 0);   transform: translate(0, 0); opacity: 0; }
+}
+
+/* Department header bar pulse */
+@keyframes headerBarPulse {
+  0%   { opacity: 0.4; }
+  50%  { opacity: 0.9; }
+  100% { opacity: 0.4; }
+}
+
+/* Progress shimmer sweep */
+@keyframes progressShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* Status badge glow pulse */
+@keyframes statusBadgePulse {
+  0%   { opacity: 0.7; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* Activity dots bounce */
+@keyframes activityDot {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%       { transform: translateY(-3px); opacity: 1; }
+}
+
+/* Department complete seal glow */
+@keyframes completeSeal {
+  0%   { opacity: 0.8; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+/* Flash burst on player action */
+@keyframes flashBurst {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* CSS particle float — for success/completion */
+@keyframes particleFloat {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--px, 0px), var(--py, -120px)) scale(0.3); opacity: 0; }
+}
+
+/* Score pop: +N counter reveal */
+@keyframes scorePop {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  60%  { transform: translateY(-18px) scale(1.15); opacity: 0.9; }
+  100% { transform: translateY(-36px) scale(0.8); opacity: 0; }
+}
+
+/* Result card scan reveal */
+@keyframes scanReveal {
+  from { clip-path: inset(0 100% 0 0); opacity: 0.3; }
+  to   { clip-path: inset(0 0% 0 0); opacity: 1; }
+}
+
+/* Lobby QR border sweep */
+@keyframes borderSweep {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Deploying grid scan */
+@keyframes deployScan {
+  0%   { transform: translateY(-100%); opacity: 0.6; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* All systems go ticker */
+@keyframes allSystemsTicker {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-100%); }
+}
+
+/* ─── Power Mini-Game Animations ────────────────────────────────────────── */
+
+.power-ripple {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(250, 204, 21, 0.7);
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  animation: powerRipple 0.55s ease-out forwards;
+}
+
+@keyframes powerRipple {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) scale(16); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(20); opacity: 0; }
+}
+
+@keyframes powerComplete {
+  from {
+    box-shadow: 0 0 40px #facc15aa, 0 0 80px #facc1440;
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 80px #facc15ee, 0 0 160px #facc1470;
+    transform: scale(1.04);
+  }
+}
+
+/* ─── Data Cleaning Mini-Game Animations ─────────────────────────────────── */
+
+@keyframes tokenSlideIn {
+  from { transform: translateX(60px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.data-token-enter {
+  animation: tokenSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes sortCorrect {
+  0%   { background: rgba(74, 222, 128, 0.4); transform: scale(1.12); }
+  60%  { background: rgba(74, 222, 128, 0.15); transform: scale(1.05); }
+  100% { background: transparent; transform: scale(1); opacity: 0; }
+}
+
+.data-sort-correct {
+  animation: sortCorrect 0.45s ease-out forwards;
+}
+
+@keyframes bucketShake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-6px); }
+  40%  { transform: translateX(5px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+.data-bucket-shake {
+  animation: bucketShake 0.35s ease-out;
+}
+
+.data-bucket-over {
+  box-shadow: 0 0 0 2px #60a5fa, 0 0 20px rgba(96, 165, 250, 0.4);
+}
+
+@keyframes dataComplete {
+  from {
+    box-shadow: 0 0 40px #60a5faaa, 0 0 80px #60a5fa40;
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 80px #60a5faee, 0 0 160px #60a5fa70;
+    transform: scale(1.03);
+  }
+}
+
+/* ─── Zip-Zap Firewall Mini-Game Animations ─────────────────────────────── */
+
+@keyframes zipzapCorrect {
+  0%   { transform: scale(1);    box-shadow: 0 0 0px #34d39900; }
+  30%  { transform: scale(1.08); box-shadow: 0 0 28px #34d399cc; }
+  70%  { transform: scale(1.04); box-shadow: 0 0 14px #34d39966; }
+  100% { transform: scale(1);    box-shadow: 0 0 0px #34d39900; }
+}
+
+.zipzap-correct {
+  animation: zipzapCorrect 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes zipzapWrong {
+  0%   { transform: translateX(0)  scale(1);    box-shadow: 0 0 0px #f8717100; }
+  15%  { transform: translateX(-7px) scale(1.02); box-shadow: 0 0 20px #f87171cc; }
+  35%  { transform: translateX(6px)  scale(1.01); }
+  55%  { transform: translateX(-5px) scale(1.01); }
+  75%  { transform: translateX(3px)  scale(1); }
+  100% { transform: translateX(0)  scale(1);    box-shadow: 0 0 0px #f8717100; }
+}
+
+.zipzap-wrong {
+  animation: zipzapWrong 0.4s ease-out forwards;
+}
+
+@keyframes zipzapStepPulse {
+  0%   { box-shadow: 0 0 6px #34d399aa;  transform: scale(1); }
+  50%  { box-shadow: 0 0 18px #34d399ff; transform: scale(1.08); }
+  100% { box-shadow: 0 0 6px #34d399aa;  transform: scale(1); }
+}
+
+.zipzap-step-active {
+  animation: zipzapStepPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes securityComplete {
+  from {
+    box-shadow: 0 0 40px #34d399aa, 0 0 80px #34d39940;
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 80px #34d399ee, 0 0 160px #34d39970;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes threatScan {
+  0%   { transform: translateX(-100%); opacity: 0.6; }
+  50%  { opacity: 0.9; }
+  100% { transform: translateX(100%);  opacity: 0; }
+}
+
+.threat-scan-line {
+  animation: threatScan 1.6s linear infinite;
+}
+
+/* ─── AI Core Puzzle Mini-Game Animations ───────────────────────────────── */
+
+@keyframes puzzleCardSolve {
+  0%   { transform: scale(1);    background-color: rgba(192, 132, 252, 0.12); box-shadow: 0 0 0 0 #c084fc00; }
+  25%  { transform: scale(1.05); background-color: rgba(74, 222, 128, 0.35);  box-shadow: 0 0 20px #4ade8088; }
+  60%  { transform: scale(1.03); background-color: rgba(192, 132, 252, 0.30); box-shadow: 0 0 12px #c084fc66; }
+  100% { transform: scale(1);    background-color: rgba(192, 132, 252, 0.12); box-shadow: 0 0 0 0 #c084fc00; }
+}
+
+.puzzle-card-solve {
+  animation: puzzleCardSolve 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes puzzleCardSelected {
+  0%   { box-shadow: 0 0 0 2px #c084fc, 0 0 12px #c084fc55; }
+  50%  { box-shadow: 0 0 0 2px #c084fc, 0 0 24px #c084fcaa; }
+  100% { box-shadow: 0 0 0 2px #c084fc, 0 0 12px #c084fc55; }
+}
+
+.puzzle-card-selected {
+  animation: puzzleCardSelected 0.9s ease-in-out infinite;
+}
+
+@keyframes modelComplete {
+  from {
+    box-shadow: 0 0 40px #c084fcaa, 0 0 80px #c084fc40;
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 80px #c084fcee, 0 0 160px #c084fc70;
+    transform: scale(1.04);
+  }
+}
+
+/* ─── AI Core Centre Animations ─────────────────────────────────────────── */
+
+@keyframes aiCorePulse {
+  0%   { transform: scale(1);    box-shadow: 0 0 30px rgba(56,189,248,0.35), 0 0 60px rgba(56,189,248,0.15); }
+  50%  { transform: scale(1.03); box-shadow: 0 0 50px rgba(56,189,248,0.55), 0 0 100px rgba(56,189,248,0.25); }
+  100% { transform: scale(1);    box-shadow: 0 0 30px rgba(56,189,248,0.35), 0 0 60px rgba(56,189,248,0.15); }
+}
+
+@keyframes aiCoreVictory {
+  0%   { box-shadow: 0 0 40px #4ade8088, 0 0 80px #4ade8040; transform: scale(1); }
+  50%  { box-shadow: 0 0 80px #4ade80cc, 0 0 160px #4ade8070; transform: scale(1.06); }
+  100% { box-shadow: 0 0 40px #4ade8088, 0 0 80px #4ade8040; transform: scale(1); }
+}
+
+/* Orbit particle effect */
+@keyframes orbitPulse {
+  0%   { transform: rotate(0deg)   translateX(60px) rotate(0deg);   opacity: 1; }
+  100% { transform: rotate(360deg) translateX(60px) rotate(-360deg); opacity: 1; }
+}
+
+/* ─── SVG Pipeline Flow Animations ─────────────────────────────────────── */
+
+@keyframes pipelineFlow {
+  0%   { stroke-dashoffset: 180; opacity: 0.4; }
+  50%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0.4; }
+}
+
+@keyframes pipelineFlash {
+  0%   { opacity: 1; stroke-width: 5; }
+  50%  { opacity: 0.85; stroke-width: 6; }
+  100% { opacity: 0; stroke-width: 2; }
+}
+
+/* ─── Event Banner Animations ───────────────────────────────────────────── */
+
+@keyframes warningPulse {
+  0%   { opacity: 0.82; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.82; }
+}
+
+@keyframes bannerSlideIn {
+  from { transform: translateY(-110%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.event-banner-enter {
+  animation: bannerSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ─── Timer Danger Animations ───────────────────────────────────────────── */
+
+@keyframes timerDanger {
+  0%   { transform: scale(1);    color: #f87171; }
+  15%  { transform: scale(1.14); color: #fca5a5; }
+  30%  { transform: scale(1);    color: #f87171; }
+  100% { transform: scale(1);    color: #f87171; }
+}
+
+.timer-danger {
+  animation: timerDanger 0.85s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* ─── Deployment / Results Animations ──────────────────────────────────── */
+
+@keyframes deployFill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+@keyframes resultReveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-reveal {
+  animation: resultReveal 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+.result-reveal-delay-1 { animation-delay: 0.1s; opacity: 0; }
+.result-reveal-delay-2 { animation-delay: 0.25s; opacity: 0; }
+.result-reveal-delay-3 { animation-delay: 0.4s; opacity: 0; }
+.result-reveal-delay-4 { animation-delay: 0.55s; opacity: 0; }
+.result-reveal-delay-5 { animation-delay: 0.7s; opacity: 0; }
+
+/* ─── Idle Screen — Ambient Particles ──────────────────────────────────── */
+
+@keyframes floatParticle {
+  0%   { transform: translateY(0px)   scale(1);   opacity: 0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.4; }
+  100% { transform: translateY(-140px) scale(0.5); opacity: 0; }
+}
+
+.idle-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.7);
+  pointer-events: none;
+  animation: floatParticle linear infinite;
+}
+
+/* ─── Success Celebration Particles ─────────────────────────────────────── */
+
+.success-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particleFloat 1.4s ease-out forwards;
+}
+
+/* ─── Lobby Corner Brackets (QR panel) ──────────────────────────────────── */
+
+.qr-bracket::before,
+.qr-bracket::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(56, 189, 248, 0.7);
+  border-style: solid;
+}
+
+.qr-bracket::before {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+  border-radius: 2px 0 0 0;
+}
+
+.qr-bracket::after {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2px 2px 0;
+  border-radius: 0 0 2px 0;
+}
