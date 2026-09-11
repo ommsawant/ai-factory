@@ -1,69 +1,149 @@
-# Air Jam Minimal Template
+# AI Factory — Build • Break • Survive
 
-The smallest possible Air Jam game. Everyone who joins gets a big TAP button
-on their phone; every tap bumps a shared count shown huge on the host screen.
+> **5-player cooperative party game. Five engineers. One shared AI Factory. Deploy the AI before time runs out.**
 
-Use this template when you want a clean slate to build on.
+Live at → **[ai-factory-game.vercel.app](https://ai-factory-game.vercel.app)**
 
-## What's here
+---
+
+## What is it?
+
+AI Factory is a real-time multiplayer party game built on the [Air Jam](https://airjam.gg) platform. Up to 5 players join from their phones; one screen acts as the shared host display. Each player is assigned a unique engineering role and must complete their mini-game fast enough to keep the Factory alive. If the team's collective Factory Health reaches ≥ 70% by the time the 60-second countdown ends, everyone wins.
+
+---
+
+## Roles & Mini-Games
+
+| Role | Mini-Game | Goal |
+|---|---|---|
+| ⚡ Power Engineer | **Tap-Tap Power** — rapid tap button | Fill the power bar with 50 taps |
+| 🗄️ Data Engineer | **Data Cleaning** — drag tokens to correct buckets | Sort 20 data tokens correctly |
+| 🔒 Security Engineer | **Zip-Zap Firewall** — press ZIP or ZAP in sequence | Hit the right buttons in a growing pattern |
+| 🤖 AI Model Engineer | **AI Core Puzzle** — arrange pipeline tiles | Solve 5 pipeline puzzle rounds |
+| ❄️ Cooling Engineer | **Gyro Temperature Control** — tilt phone to level bubble | Keep the temperature in the 70–75 °C safe zone |
+
+---
+
+## How to Play
+
+1. Open the game URL on a TV or laptop (the **host screen**).
+2. Up to 5 players scan the QR code with their phones (the **controller screen**).
+3. Each player is auto-assigned one of the five engineer roles.
+4. The host presses **Launch Mission** to start the 60-second countdown.
+5. Every player works their mini-game simultaneously.
+6. When the timer hits zero, Factory Health is calculated — **≥ 70% is a win**.
+
+---
+
+## Winning Conditions
+
+- **Factory Health ≥ 70%** → Team wins 🎉
+- **Any department below 40%** → Critical failure, team loses 💥
+- Factory Health = average of all five department progress scores
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | [React 19](https://react.dev) + [TypeScript](https://typescriptlang.org) |
+| Build | [Vite 6](https://vitejs.dev) |
+| Multiplayer | [Air Jam SDK](https://airjam.gg) |
+| State | Zustand (via Air Jam replicated store) |
+| Input | Air Jam controller input (buttons, touch, motion/gyroscope) |
+| Deployment | [Vercel](https://vercel.com) |
+
+---
+
+## Project Structure
 
 ```
 src/
-├── airjam.config.ts   # game metadata plus SDK runtime/controller/input config
-├── main.tsx           # React entry — mounts <BrowserRouter> and <App>
-├── app.tsx            # Routes: "/" → host, "/controller" → controller
+├── airjam.config.ts          # Air Jam app metadata, runtime, and agent contract
+├── app.tsx                   # Routes: "/" → host, "/controller" → controller
+├── main.tsx                  # React entry point
+├── index.css                 # Global styles
+│
 ├── game/
-│   ├── input.ts       # Controller → host input schema (empty here)
-│   └── store.ts       # Networked state + actions (the tap counter)
+│   ├── config/
+│   │   └── gameConfig.ts     # ⚙️  All tuning constants (timer, scoring, thresholds)
+│   ├── contracts/
+│   │   └── agent.ts          # Semantic agent contract (MCP + AI agent surface)
+│   ├── domain/
+│   │   ├── types.ts          # Core game types and role definitions
+│   │   └── factoryHealth.ts  # Factory Health calculation logic
+│   ├── store/
+│   │   └── factoryStore.ts   # Replicated game state + all store actions
+│   └── input.ts              # Controller input schema (gyroscope for cooling)
+│
 ├── host/
-│   └── index.tsx      # What the TV shows
+│   ├── index.tsx             # Host screen — lobby, gameplay view, end screen
+│   └── components/           # Host UI components (DeptPanel, HexGrid, etc.)
+│
 └── controller/
-    └── index.tsx      # What a phone shows
+    └── index.tsx             # Controller screen — role selector + all mini-games
 ```
 
-That's the whole game. About 150 lines of actual TypeScript across the three
-files in `game/`, `host/`, and `controller/`.
+---
 
-## Three lanes, only two used
-
-The SDK offers three ways to move data between the host and controllers:
-
-| Lane   | What it's for                             | Used here?                    |
-| ------ | ----------------------------------------- | ----------------------------- |
-| State  | Replicated store + host-authoritative RPC | Yes — `useMinimalStore`       |
-| Signal | Out-of-band UX (haptics, toasts)          | No — keep this starter simple |
-| Input  | High-frequency per-frame controller input | No — taps are discrete events |
-
-When you need continuous controller input (joystick, paddle, motion),
-`useInputWriter` / `useControllerTick` on the controller + `host.getInput()`
-on the host is the pattern. See the `pong` template for a worked example.
-
-## Run it
+## Local Development
 
 ```bash
+# Install dependencies
 pnpm install
+
+# Start local dev server (Air Jam backend + Vite frontend)
 pnpm dev
 ```
 
-Then open the printed URL on a laptop (host) and scan the QR on your phone
-(controller).
+Open the printed URL on a laptop as the host screen and scan the QR code on your phone as a controller.
 
-## Extend it
+### Other commands
 
-Good places to grow from here:
+```bash
+pnpm run typecheck     # TypeScript type check (no emit)
+pnpm run test          # Unit tests (Vitest)
+pnpm run test:e2e      # End-to-end tests (Playwright)
+pnpm run build         # Production build (tsc + vite build)
+```
 
-1. **Add a game phase.** Replace the flat counter with a 30-second round: add
-   `matchPhase: "lobby" | "playing" | "ended"` to the store, a countdown on
-   the host, and a disabled state on the controller between rounds.
-2. **Add real input.** Turn the button into a held accelerator: populate
-   `gameInputSchema` with a `held: boolean`, publish it with
-   `useInputWriter`, and read it on the host with `host.getInput(playerId)`.
-3. **Add per-player identity.** `controller.selfPlayer` exposes the connected
-   player profile (name, color). Show it on both surfaces. Plug
-   `ControllerPlayerNameField` into the controller for editable names.
-4. **Add a toast.** Use `useSendSignal()` on the host and call
-   `sendSignal("TOAST", { message: "…" })` to show a banner on controllers —
-   good for round results.
+---
 
-When any of those grow, look at `pong` as a reference for the same primitives
-in a fuller shape.
+## Configuration
+
+All game tuning lives in a single file: [`src/game/config/gameConfig.ts`](src/game/config/gameConfig.ts)
+
+Key values:
+
+| Constant | Value | Description |
+|---|---|---|
+| `gameDurationSeconds` | `60` | Total game timer (seconds) |
+| `factorySuccessThreshold` | `70` | Factory Health % needed to win |
+| `criticalDeptMinimum` | `40` | Min dept % — if any drops below this, team loses |
+| `maxPlayers` | `5` | One player per engineering role |
+
+---
+
+## Deployment
+
+The project is deployed on Vercel and linked via `.vercel/project.json`.
+
+To deploy a new version:
+
+```bash
+npx vercel --prod
+```
+
+Or push to the connected Git repository and Vercel will auto-deploy.
+
+---
+
+## Built with Air Jam
+
+This game uses the [Air Jam](https://airjam.gg) platform for:
+
+- **QR-based controller joining** — no app download required
+- **Replicated game state** — host-authoritative actions synced to all players
+- **Gyroscope controller input** — real phone motion used for the Cooling mini-game
+- **Semantic agent contract** — exposes game state and actions for AI/MCP tooling
