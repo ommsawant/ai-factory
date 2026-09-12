@@ -20,7 +20,7 @@ AI Factory is a real-time multiplayer party game built on the [Air Jam](https://
 | 🗄️ Data Engineer | **Data Cleaning** — drag tokens to correct buckets | Sort 20 data tokens correctly |
 | 🔒 Security Engineer | **Zip-Zap Firewall** — press ZIP or ZAP in sequence | Hit the right buttons in a growing pattern |
 | 🤖 AI Model Engineer | **AI Core Puzzle** — arrange pipeline tiles | Solve 5 pipeline puzzle rounds |
-| ❄️ Cooling Engineer | **Gyro Temperature Control** — tilt phone to level bubble | Keep the temperature in the 70–75 °C safe zone |
+| 🔤 Knowledge Engineer | **AI Term Scramble** — tap letters to unscramble AI terms | Solve scrambled AI terms |
 
 ---
 
@@ -32,12 +32,14 @@ AI Factory is a real-time multiplayer party game built on the [Air Jam](https://
 4. The host presses **Launch Mission** to start the 60-second countdown.
 5. Every player works their mini-game simultaneously.
 6. When the timer hits zero, Factory Health is calculated — **≥ 70% is a win**.
+7. If the team wins, the game transitions into a **10-second Sudden Death AI Logo Quiz**, where players compete for the Golden Ticket.
 
 ---
 
 ## Winning Conditions
 
 - **Factory Health ≥ 70%** → Team wins 🎉
+- **Sudden Death / Golden Ticket** → After a successful deployment, players compete in a fast-paced AI Logo Quiz to win the Golden Ticket. 🎫
 - **Any department below 40%** → Critical failure, team loses 💥
 - Factory Health = average of all five department progress scores
 
@@ -145,5 +147,4 @@ This game uses the [Air Jam](https://airjam.gg) platform for:
 
 - **QR-based controller joining** — no app download required
 - **Replicated game state** — host-authoritative actions synced to all players
-- **Gyroscope controller input** — real phone motion used for the Cooling mini-game
 - **Semantic agent contract** — exposes game state and actions for AI/MCP tooling
