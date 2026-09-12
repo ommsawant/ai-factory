@@ -39,17 +39,20 @@ export const agentContract = defineAirJamAgentContract({
         data: { progress: state.data.progress, status: state.data.status, score: state.data.score },
         security: { progress: state.security.progress, status: state.security.status, score: state.security.score },
         model: { progress: state.model.progress, status: state.model.status, score: state.model.score },
-        cooling: {
-          progress: state.cooling.progress,
-          status: state.cooling.status,
-          score: state.cooling.score,
-          temperature: state.cooling.temperature,
+        knowledge: {
+          progress: state.knowledge.progress,
+          status: state.knowledge.status,
+          score: state.knowledge.score,
+          solvedCount: state.knowledge.solvedCount,
         },
       },
       factoryHealth: state.factoryHealth,
       teamScore: state.teamScore,
       activeEvents: state.activeEvents,
       finalResult: state.finalResult,
+      suddenDeathScores: state.suddenDeathScores,
+      suddenDeathWinner: state.suddenDeathWinner,
+      currentQuizIndex: state.currentQuizIndex,
     };
   },
   actions: {
@@ -112,7 +115,7 @@ export const agentContract = defineAirJamAgentContract({
           }),
         ),
         description:
-          "Send a Zip-Zap Firewall press from the Security Engineer controller. The controller owns the sequence and validates locally; the store receives only whether the press was correct.",
+          "Send a AI/ML Firewall press from the Security Engineer controller. The controller owns the sequence and validates locally; the store receives only whether the press was correct.",
         availability: "Only while phase is 'playing' and the caller is assigned the 'security' role.",
         resultDescription:
           "On hit=true: Security progress increases by securityIncrementPerHit, factory health and team score update. On hit=false: Security progress decreases by securityPenaltyPerMiss (clamped to 0), no score change.",
@@ -127,6 +130,17 @@ export const agentContract = defineAirJamAgentContract({
         availability: "Only while phase is 'playing' and the caller is assigned the 'model' role.",
         resultDescription:
           "Model progress increases by modelIncrementPerSolve, factory health and team score update.",
+      },
+    ),
+    solve_knowledge_term: agentAction.participant(
+      { actionName: "solveKnowledgeTerm" },
+      {
+        input: agentActionInput.zod(z.object({})),
+        description:
+          "Send a term solve action from the AI Knowledge Engineer controller. The controller validates the scrambled AI term locally and dispatches this action only on a correct answer.",
+        availability: "Only while phase is 'playing' and the caller is assigned the 'knowledge' role.",
+        resultDescription:
+          "Knowledge progress increases by knowledgeIncrementPerSolve, solvedCount increments, factory health and team score update.",
       },
     ),
     dev_increment_power: agentAction.participant(
@@ -173,15 +187,28 @@ export const agentContract = defineAirJamAgentContract({
         resultDescription: "Model progress, factory health, and team score update.",
       },
     ),
-    dev_set_cooling_temp: agentAction.participant(
-      { actionName: "devSetCoolingTemp" },
+    dev_increment_knowledge: agentAction.participant(
+      { actionName: "devIncrementKnowledge" },
       {
         input: agentActionInput.zod(
-          z.object({ temperature: z.number().min(50).max(120) }),
+          z.object({ amount: z.number().int().min(1).max(100) }),
         ),
-        description: "[DEV] Set the Cooling department temperature directly.",
+        description: "[DEV] Increment the AI Knowledge department progress.",
         availability: "Only while phase is 'playing'.",
-        resultDescription: "Cooling temperature, progress, and factory health update.",
+        resultDescription: "Knowledge progress, factory health, and team score update.",
+      },
+    ),
+    answer_quiz: agentAction.participant(
+      { actionName: "answerQuiz" },
+      {
+        input: agentActionInput.zod(
+          z.object({ logoId: z.string().describe("The id of the AI logo tile the player tapped, e.g. 'chatgpt'.") }),
+        ),
+        description:
+          "Send a quiz answer during the Sudden Death Golden Ticket phase. All 5 controllers show the same 15-logo grid. The first player to tap the correct logo for the current question scores a point.",
+        availability: "Only while phase is 'suddenDeath'.",
+        resultDescription:
+          "On correct: suddenDeathScores[actorId] increments by 1, currentQuizIndex advances. On incorrect: no state change.",
       },
     ),
   },

@@ -2,12 +2,14 @@
  * Controller surface — AI Factory.
  *
  * Phases:
- *  connecting → skeleton waiting screen
- *  idle       → join lobby (auto-request role on mount)
- *  lobby      → show assigned role, wait for host to start
- *  playing    → Power: tap; Data: sort; Security: Zip-Zap; Model: puzzle;
- *               Cooling: gyroscope spirit-level (with touch fallback)
- *  ended      → final result
+ *  connecting  → skeleton waiting screen
+ *  name-entry  → player enters their name (stored in localStorage)
+ *  idle        → join lobby (auto-request role on mount, guarded by name)
+ *  lobby       → show assigned role, wait for host to start
+ *  playing     → Power: tap; Data: sort; Security: Zip-Zap; Model: puzzle;
+ *                 Knowledge: AI Term Scramble (tap letters to unscramble AI terms)
+ *  suddenDeath → Golden Ticket AI Logo Quiz (all players, competitive)
+ *  ended       → final result + Golden Ticket winner announcement
  */
 import { useAirJamController } from "@air-jam/sdk";
 import { SurfaceViewport } from "@air-jam/sdk/ui";
@@ -21,6 +23,7 @@ import {
   type PlayerRole,
 } from "../game/domain/types";
 import { useFactoryStore, type FactoryState } from "../game/store/factoryStore";
+import { SuddenDeathController } from "./components/SuddenDeathController";
 
 // ── Power mini-game ──────────────────────────────────────────────────
 
@@ -219,66 +222,49 @@ function PowerGame({ progress, status, score, onTap }: PowerGameProps) {
   );
 }
 
-// ── Cooling temperature dev panel ─────────────────────────────────────────
+// ── AI Term Scramble data ────────────────────────────────────────────────────
 
-function CoolingDevPanel({
-  temperature,
-  onSet,
-}: {
-  temperature: number;
-  onSet: (t: number) => void;
-}) {
-  const [localTemp, setLocalTemp] = useState(temperature);
+interface KnowledgeTerm {
+  word: string;
+  explanation: string;
+}
 
-  return (
-    <div className="flex flex-col items-center gap-4 w-full">
-      <div className="text-5xl font-black text-sky-300 font-mono">
-        {localTemp.toFixed(0)}°C
-      </div>
-      <div className="text-sm text-slate-400">
-        Safe zone: {GAME_CONFIG.coolingSafeMin}–{GAME_CONFIG.coolingSafeMax}°C
-      </div>
+const AI_TERMS: KnowledgeTerm[] = [
+  { word: "AI",     explanation: "Machines that think and learn." },
+  { word: "DATA",   explanation: "Information used by AI systems." },
+  { word: "MODEL",  explanation: "The AI's trained brain." },
+  { word: "PROMPT", explanation: "Instructions you give to an AI." },
+  { word: "LLM",    explanation: "A large language model like ChatGPT." },
+  { word: "RAG",    explanation: "AI that retrieves knowledge to answer." },
+  { word: "GPU",    explanation: "Hardware that powers AI training." },
+  { word: "API",    explanation: "How apps connect to AI services." },
+  { word: "TOKEN",  explanation: "A word or piece of text for AI." },
+];
 
-      <input
-        type="range"
-        min={50}
-        max={120}
-        value={localTemp}
-        onChange={(e) => {
-          const t = Number(e.target.value);
-          setLocalTemp(t);
-          onSet(t);
-        }}
-        className="w-full accent-sky-400"
-        style={{ touchAction: "none" }}
-      />
+/** Shuffle an array and return a new array (Fisher-Yates). */
+function shuffleArray<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
-      <div className="flex gap-3 w-full">
-        <button
-          type="button"
-          className="ctrl-button flex-1 rounded-xl bg-sky-500/20 border border-sky-500/40 py-3 text-sky-300 font-bold text-lg hover:bg-sky-500/30 active:scale-95 transition-all"
-          onClick={() => {
-            const t = Math.max(50, localTemp - 5);
-            setLocalTemp(t);
-            onSet(t);
-          }}
-        >
-          − Cool
-        </button>
-        <button
-          type="button"
-          className="ctrl-button flex-1 rounded-xl bg-orange-500/20 border border-orange-500/40 py-3 text-orange-300 font-bold text-lg hover:bg-orange-500/30 active:scale-95 transition-all"
-          onClick={() => {
-            const t = Math.min(120, localTemp + 5);
-            setLocalTemp(t);
-            onSet(t);
-          }}
-        >
-          + Heat
-        </button>
-      </div>
-    </div>
-  );
+/**
+ * Scramble a word's letters into a random order.
+ * Keeps re-scrambling if the result accidentally equals the original.
+ */
+function scrambleWord(word: string): string[] {
+  if (word.length <= 1) return [word];
+  let letters = shuffleArray(word.split(""));
+  // Prevent trivial identity scramble for short words
+  let attempts = 0;
+  while (letters.join("") === word && attempts < 10) {
+    letters = shuffleArray(word.split(""));
+    attempts++;
+  }
+  return letters;
 }
 
 // ── Data Cleaning mini-game ───────────────────────────────────────────────
@@ -780,7 +766,7 @@ function ZipZapGame({ progress, status, score, onZipZap }: ZipZapGameProps) {
                     transition: "all 0.15s ease",
                   }}
                 >
-                  {isDone ? "✓" : step}
+                  {isDone ? "✓" : step === "ZIP" ? "AI" : "ML"}
                 </span>
               );
             })}
@@ -816,7 +802,7 @@ function ZipZapGame({ progress, status, score, onZipZap }: ZipZapGameProps) {
             touchAction: "none",
           }}
         >
-          <div className="text-3xl font-black" style={{ color, fontFamily: "var(--font-mono)" }}>ZIP</div>
+          <div className="text-3xl font-black" style={{ color, fontFamily: "var(--font-mono)" }}>AI</div>
           <div className="text-[10px] text-slate-500 uppercase tracking-widest">Block</div>
         </button>
 
@@ -846,7 +832,7 @@ function ZipZapGame({ progress, status, score, onZipZap }: ZipZapGameProps) {
             touchAction: "none",
           }}
         >
-          <div className="text-3xl font-black" style={{ color: "#6ee7b7", fontFamily: "var(--font-mono)" }}>ZAP</div>
+          <div className="text-3xl font-black" style={{ color: "#6ee7b7", fontFamily: "var(--font-mono)" }}>ML</div>
           <div className="text-[10px] text-slate-500 uppercase tracking-widest">Zap</div>
         </button>
       </div>
@@ -1156,204 +1142,159 @@ function AiCorePuzzleGame({ progress, status, score, onSolve }: AiCorePuzzleGame
   );
 }
 
-// ── Cooling Engineer mini-game — Gyroscope spirit level ──────────────────
+// ── AI Knowledge Engineer mini-game — AI Term Scramble ───────────────────
 
-/**
- * Tries to request DeviceOrientationEvent permission (required on iOS 13+).
- * Resolves to 'granted' | 'denied' | 'unavailable'.
- */
-async function requestOrientationPermission(): Promise<"granted" | "denied" | "unavailable"> {
-  // iOS 13+ requires an explicit permission call.
-  if (
-    typeof DeviceOrientationEvent !== "undefined" &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    typeof (DeviceOrientationEvent as any).requestPermission === "function"
-  ) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (DeviceOrientationEvent as any).requestPermission();
-      return result === "granted" ? "granted" : "denied";
-    } catch {
-      return "denied";
-    }
-  }
-  // Android / desktop: event fires without a permission prompt.
-  if (typeof DeviceOrientationEvent !== "undefined" && "ondeviceorientation" in window) {
-    return "granted";
-  }
-  return "unavailable";
-}
-
-type OrientationState = "idle" | "requesting" | "granted" | "denied" | "unavailable";
-
-interface CoolingGameProps {
-  temperature: number;
+interface KnowledgeGameProps {
   progress: number;
   status: string;
   score: number;
-  onTick: (centeredness: number) => void;
+  solvedCount: number;
+  onSolve: () => void;
 }
 
-function CoolingGame({ temperature, progress, status, score, onTick }: CoolingGameProps) {
+function KnowledgeTermScrambleGame({ progress, status, score, solvedCount, onSolve }: KnowledgeGameProps) {
   const isComplete = status === "complete";
-  const color = "#38bdf8"; // sky-400 — cooling role colour
+  const color = "#a78bfa"; // violet — knowledge role colour
 
-  // ── Orientation permission state ────────────────────────────────────────
-  const [orientState, setOrientState] = useState<OrientationState>("idle");
+  // ── Term state ───────────────────────────────────────────────────────────
+  // Pick random term, cycling through the list avoiding immediate repeats.
+  const lastTermIndexRef = useRef(-1);
 
-  // ── Live bubble position in normalised [-1, 1] x/y space ────────────────
-  // x = left/right (gamma), y = front/back (beta)
-  const bubblePosRef = useRef({ x: 0, y: 0 });
-  const [bubblePos, setBubblePos] = useState({ x: 0, y: 0 });
+  const pickNextTerm = useCallback((): KnowledgeTerm => {
+    let idx: number;
+    do {
+      idx = Math.floor(Math.random() * AI_TERMS.length);
+    } while (idx === lastTermIndexRef.current && AI_TERMS.length > 1);
+    lastTermIndexRef.current = idx;
+    return AI_TERMS[idx];
+  }, []);
 
-  // ── Bounds circle ref (for touch coordinate mapping) ────────────────────
-  const boundsRef = useRef<HTMLDivElement>(null);
+  const [currentTerm, setCurrentTerm] = useState<KnowledgeTerm>(() => pickNextTerm());
+  const [scrambled, setScrambled] = useState<string[]>(() => scrambleWord(currentTerm.word));
 
-  // ── Periodic network tick ───────────────────────────────────────────────
-  const lastTickRef = useRef(0);
+  // Player's assembled answer: array of letter indices from scrambled array (null = unselected slot)
+  const [selected, setSelected] = useState<(number | null)[]>(() => Array(currentTerm.word.length).fill(null));
+
+  // Feedback state: null | 'correct' | 'wrong'
+  const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  // Explanation display after correct
+  const [showExplanation, setShowExplanation] = useState(false);
+  // Shake animation for wrong answer
+  const [shake, setShake] = useState(false);
+
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Advance to next term ────────────────────────────────────────────────
+  const advanceTerm = useCallback(() => {
+    const next = pickNextTerm();
+    setCurrentTerm(next);
+    setScrambled(scrambleWord(next.word));
+    setSelected(Array(next.word.length).fill(null));
+    setFeedback(null);
+    setShowExplanation(false);
+  }, [pickNextTerm]);
+
+  // ── Tap a scrambled letter to add it to the answer ──────────────────────
+  const handleLetterTap = useCallback(
+    (scrambledIdx: number) => {
+      if (feedback !== null) return; // locked during feedback
+      // Already selected?
+      if (selected.includes(scrambledIdx)) return;
+      // Find first empty slot
+      const firstEmpty = selected.indexOf(null);
+      if (firstEmpty === -1) return; // all slots filled
+      const next = [...selected];
+      next[firstEmpty] = scrambledIdx;
+      setSelected(next);
+    },
+    [selected, feedback],
+  );
+
+  // ── Tap a filled answer slot to remove the letter ───────────────────────
+  const handleSlotTap = useCallback(
+    (slotIdx: number) => {
+      if (feedback !== null) return;
+      if (selected[slotIdx] === null) return;
+      const next = [...selected];
+      next[slotIdx] = null;
+      setSelected(next);
+    },
+    [selected, feedback],
+  );
+
+  // ── Auto-submit when all slots are filled ───────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => {
-      const { x, y } = bubblePosRef.current;
-      // centeredness: 0 = perfect centre, 1 = edge
-      const centeredness = Math.min(1, Math.sqrt(x * x + y * y));
-      onTick(centeredness);
-    }, GAME_CONFIG.coolingTickThrottleMs);
-    return () => clearInterval(id);
-  }, [onTick]);
+    // Wait until all slots are filled
+    if (selected.some((s) => s === null)) return;
+    if (feedback !== null) return;
 
-  // ── Device orientation event listener ───────────────────────────────────
-  useEffect(() => {
-    if (orientState !== "granted") return;
+    const answer = selected.map((i) => (i !== null ? scrambled[i] : "")).join("");
+    const isCorrect = answer === currentTerm.word;
 
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const gamma = e.gamma ?? 0; // left/right tilt, -90 to 90
-      const beta = e.beta ?? 0;  // front/back tilt, -180 to 180
-
-      const maxAngle = GAME_CONFIG.coolingMaxTiltAngle;
-      const nx = Math.min(1, Math.max(-1, gamma / maxAngle));
-      const ny = Math.min(1, Math.max(-1, (beta - 45) / maxAngle)); // 45° offset for natural hold
-
-      bubblePosRef.current = { x: nx, y: ny };
-      setBubblePos({ x: nx, y: ny });
-    };
-
-    window.addEventListener("deviceorientation", handleOrientation, true);
-    return () => window.removeEventListener("deviceorientation", handleOrientation, true);
-  }, [orientState]);
-
-  // ── Touch drag fallback ─────────────────────────────────────────────────
-  const touchActiveRef = useRef(false);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchActiveRef.current = true;
-    e.preventDefault();
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchActiveRef.current || !boundsRef.current) return;
-    e.preventDefault();
-    const rect = boundsRef.current.getBoundingClientRect();
-    const touch = e.touches[0];
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const r = rect.width / 2;
-    const dx = (touch.clientX - cx) / r;
-    const dy = (touch.clientY - cy) / r;
-    // Clamp within unit circle.
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const scale = len > 1 ? 1 / len : 1;
-    const nx = dx * scale;
-    const ny = dy * scale;
-    bubblePosRef.current = { x: nx, y: ny };
-    setBubblePos({ x: nx, y: ny });
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    touchActiveRef.current = false;
-    // Glide back to center on release.
-    bubblePosRef.current = { x: 0, y: 0 };
-    setBubblePos({ x: 0, y: 0 });
-  }, []);
-
-  // ── Request permission on button press ──────────────────────────────────
-  const handleRequestPermission = useCallback(async () => {
-    setOrientState("requesting");
-    const result = await requestOrientationPermission();
-    setOrientState(result);
-  }, []);
-
-  // Auto-attempt permission on mount for non-iOS (no prompt needed).
-  useEffect(() => {
-    if (orientState === "idle") {
-      requestOrientationPermission().then((result) => {
-        // On desktop/Android we get granted immediately without user gesture.
-        // On iOS we stay 'idle' until the user taps.
-        if (result !== "denied") {
-          setOrientState(result);
-        }
-      });
+    if (isCorrect) {
+      setFeedback("correct");
+      setShowExplanation(true);
+      onSolve();
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => {
+        advanceTerm();
+      }, GAME_CONFIG.knowledgeExplanationDisplayMs);
+    } else {
+      setFeedback("wrong");
+      setShake(true);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => {
+        // Clear answer, keep same term
+        setSelected(Array(currentTerm.word.length).fill(null));
+        setFeedback(null);
+        setShake(false);
+      }, 600);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
   }, []);
 
-  // ── Derived display values ──────────────────────────────────────────────
-  const centeredness = Math.min(1, Math.sqrt(bubblePos.x ** 2 + bubblePos.y ** 2));
-  const isCentered = centeredness <= GAME_CONFIG.coolingCenteredThreshold;
-  const inSafeZone = temperature >= GAME_CONFIG.coolingSafeMin && temperature <= GAME_CONFIG.coolingSafeMax;
+  // ── Progress ring ────────────────────────────────────────────────────────
+  const radius = 72;
+  const circ = 2 * Math.PI * radius;
+  const dashOffset = circ - (progress / 100) * circ;
 
-  // Bubble render: map [-1,1] to pixels within bounds circle.
-  const BOUNDS_R = 110; // px radius of the bounds circle
-  const BUBBLE_R = 28;  // px radius of the bubble
-  const maxTravel = BOUNDS_R - BUBBLE_R;
-  const bx = bubblePos.x * maxTravel;
-  const by = bubblePos.y * maxTravel;
-
-  // Temperature colour gradient: blue (cool) → orange (hot)
-  const tempFraction = Math.min(1, Math.max(0, (temperature - 50) / 70)); // 50°=0, 120°=1
-  const tempColor = inSafeZone ? "#34d399" : tempFraction > 0.7 ? "#f87171" : tempFraction > 0.45 ? "#fb923c" : "#38bdf8";
-
-  // Progress ring.
-  const ringRadius = 50;
-  const ringCirc = 2 * Math.PI * ringRadius;
-  const ringOffset = ringCirc - (progress / 100) * ringCirc;
-
-  // ── Completion screen ───────────────────────────────────────────────────
+  // ── Completion screen ────────────────────────────────────────────────────
   if (isComplete) {
     return (
       <div
         className="flex h-full w-full flex-col items-center justify-center gap-6"
-        style={{ background: "radial-gradient(ellipse at center, #38bdf820 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse at center, #a78bfa20 0%, transparent 70%)" }}
       >
         <div
           className="flex items-center justify-center rounded-full"
           style={{
             width: 200,
             height: 200,
-            border: "4px solid #38bdf8",
-            boxShadow: "0 0 60px #38bdf8aa, 0 0 120px #38bdf840",
+            border: "4px solid #a78bfa",
+            boxShadow: "0 0 60px #a78bfaaa, 0 0 120px #a78bfa40",
             animation: "dataComplete 1.5s ease-in-out infinite alternate",
           }}
         >
-          <div style={{ fontSize: 72 }}>❄️</div>
+          <div style={{ fontSize: 72 }}>🔤</div>
         </div>
         <div
           className="text-3xl font-black uppercase tracking-widest"
-          style={{ color, textShadow: "0 0 20px #38bdf8" }}
+          style={{ color, textShadow: "0 0 20px #a78bfa" }}
         >
-          COOLING STABLE
+          KNOWLEDGE ONLINE
         </div>
-        <div className="text-sm text-slate-400">Department score: {score.toLocaleString()} pts</div>
+        <div className="text-sm text-slate-400">Terms solved: {solvedCount} · Score: {score.toLocaleString()} pts</div>
       </div>
     );
   }
 
-  // ── Permission gate — iOS needs a user-gesture tap ───────────────────────
-  const needsPermissionTap = orientState === "idle" || orientState === "requesting";
-  const showTouchFallback = orientState === "denied" || orientState === "unavailable";
-  const showOrientUI = orientState === "granted";
-
   return (
-    <div className="flex h-full w-full flex-col items-center justify-between py-3 gap-2" style={{ touchAction: "none" }}>
+    <div className="flex h-full w-full flex-col items-center justify-between py-4 gap-2">
 
       {/* Header stats */}
       <div className="flex w-full items-center justify-between px-2">
@@ -1362,209 +1303,163 @@ function CoolingGame({ temperature, progress, status, score, onTick }: CoolingGa
           <div className="font-mono text-2xl font-black" style={{ color }}>{progress}%</div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-widest text-slate-500">Temp</div>
-          <div className="font-mono text-xl font-black" style={{ color: tempColor }}>
-            {temperature.toFixed(1)}°C
-          </div>
-        </div>
-        <div className="text-center">
           <div className="text-[10px] uppercase tracking-widest text-slate-500">Score</div>
           <div className="font-mono text-lg font-bold text-sky-300">{score.toLocaleString()}</div>
         </div>
-      </div>
-
-      {/* Safe zone label */}
-      <div
-        className="text-xs font-semibold uppercase tracking-widest px-3 py-1 rounded-full"
-        style={{
-          background: inSafeZone ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.1)",
-          color: inSafeZone ? "#34d399" : "#f87171",
-          border: `1px solid ${inSafeZone ? "#34d39940" : "#f8717140"}`,
-          transition: "all 0.3s ease",
-        }}
-      >
-        {inSafeZone ? `✓ Safe zone ${GAME_CONFIG.coolingSafeMin}–${GAME_CONFIG.coolingSafeMax}°C` : `Target: ${GAME_CONFIG.coolingSafeMin}–${GAME_CONFIG.coolingSafeMax}°C`}
-      </div>
-
-      {/* Spirit level / touch area */}
-      <div className="relative flex items-center justify-center" style={{ flexShrink: 0 }}>
-        {/* Outer bounds ring */}
-        <div
-          ref={boundsRef}
-          onTouchStart={showTouchFallback ? handleTouchStart : undefined}
-          onTouchMove={showTouchFallback ? handleTouchMove : undefined}
-          onTouchEnd={showTouchFallback ? handleTouchEnd : undefined}
-          style={{
-            position: "relative",
-            width: BOUNDS_R * 2,
-            height: BOUNDS_R * 2,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(56,189,248,0.07) 0%, rgba(15,32,53,0.95) 75%)",
-            border: `2px solid ${isCentered ? "#34d399" : "rgba(56,189,248,0.3)"}`,
-            boxShadow: isCentered ? "0 0 24px #34d39960" : `0 0 12px rgba(56,189,248,0.15)`,
-            transition: "border-color 0.3s ease, box-shadow 0.3s ease",
-            overflow: "hidden",
-          }}
-        >
-          {/* Cross-hair centre marker */}
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-          }}>
-            {/* Centre ring target */}
-            <div style={{
-              width: BOUNDS_R * 2 * GAME_CONFIG.coolingCenteredThreshold * 2,
-              height: BOUNDS_R * 2 * GAME_CONFIG.coolingCenteredThreshold * 2,
-              borderRadius: "50%",
-              border: `1.5px dashed ${isCentered ? "#34d399" : "rgba(56,189,248,0.4)"}`,
-              transition: "border-color 0.3s ease",
-            }} />
-          </div>
-
-          {/* Crosshair lines */}
-          <div style={{
-            position: "absolute",
-            top: "50%",
-            left: 0,
-            right: 0,
-            height: 1,
-            background: "rgba(56,189,248,0.12)",
-            transform: "translateY(-0.5px)",
-            pointerEvents: "none",
-          }} />
-          <div style={{
-            position: "absolute",
-            left: "50%",
-            top: 0,
-            bottom: 0,
-            width: 1,
-            background: "rgba(56,189,248,0.12)",
-            transform: "translateX(-0.5px)",
-            pointerEvents: "none",
-          }} />
-
-          {/* ── Bubble ── */}
-          <div
-            style={{
-              position: "absolute",
-              width: BUBBLE_R * 2,
-              height: BUBBLE_R * 2,
-              borderRadius: "50%",
-              // Centre of bounds + offset
-              left: BOUNDS_R - BUBBLE_R + bx,
-              top: BOUNDS_R - BUBBLE_R + by,
-              background: `radial-gradient(circle at 35% 35%, ${isCentered ? "#34d399" : tempColor}cc, ${isCentered ? "#34d399" : tempColor}44)`,
-              border: `2px solid ${isCentered ? "#34d399" : tempColor}`,
-              boxShadow: `0 0 18px ${isCentered ? "#34d399" : tempColor}88`,
-              transition: orientState === "granted" ? "left 0.08s ease-out, top 0.08s ease-out" : "none",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-            }}
-          >
-            <span style={{ fontSize: 18 }}>❄️</span>
-          </div>
-
-          {/* iOS permission overlay */}
-          {needsPermissionTap && (
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              background: "rgba(5,10,20,0.82)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              zIndex: 10,
-            }}>
-              <div style={{ fontSize: 32 }}>🔄</div>
-              <div className="text-xs text-sky-300 font-bold uppercase tracking-wider text-center px-4">
-                {orientState === "requesting" ? "Requesting…" : "Tap to enable\nGyroscope"}
-              </div>
-            </div>
-          )}
-
-          {/* Touch fallback hint overlay */}
-          {showTouchFallback && centeredness < 0.05 && (
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              pointerEvents: "none",
-              zIndex: 5,
-            }}>
-              <div style={{ fontSize: 22, opacity: 0.5 }}>👆</div>
-              <div className="text-[9px] text-slate-500 uppercase tracking-widest">Drag to control</div>
-            </div>
-          )}
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-widest text-slate-500">Solved</div>
+          <div className="font-mono text-lg font-bold text-slate-300">{solvedCount}</div>
         </div>
       </div>
 
-      {/* Mode label / permission button */}
-      <div className="flex flex-col items-center gap-2 w-full px-4">
-        {needsPermissionTap && (
-          <button
-            id="cooling-enable-gyro-btn"
-            type="button"
-            onClick={handleRequestPermission}
-            disabled={orientState === "requesting"}
-            className="ctrl-button w-full rounded-2xl py-3 text-sm font-bold uppercase tracking-wider active:scale-95 transition-all"
-            style={{
-              background: "rgba(56,189,248,0.12)",
-              border: "2px solid rgba(56,189,248,0.4)",
-              color: "#38bdf8",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            🎮 Enable Gyroscope
-          </button>
-        )}
-        {showTouchFallback && (
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest text-center">
-            Touch fallback active — drag the bubble to centre
-          </div>
-        )}
-        {showOrientUI && (
-          <div className="text-[10px] text-slate-500 uppercase tracking-widest text-center">
-            Tilt your phone to centre the bubble
-          </div>
-        )}
-      </div>
-
-      {/* Progress ring + temperature */}
-      <div className="relative flex items-center justify-center" style={{ width: 120, height: 120, flexShrink: 0 }}>
-        <svg width={120} height={120} viewBox="0 0 120 120" className="absolute" style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={60} cy={60} r={ringRadius} fill="none" stroke="#1e293b" strokeWidth={7} />
+      {/* Progress ring */}
+      <div className="relative flex items-center justify-center" style={{ width: 160, height: 160, flexShrink: 0 }}>
+        <svg width={160} height={160} viewBox="0 0 160 160" className="absolute" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={80} cy={80} r={radius} fill="none" stroke="#1e293b" strokeWidth={8} />
           <circle
-            cx={60} cy={60} r={ringRadius} fill="none"
-            stroke={color} strokeWidth={7} strokeLinecap="round"
-            strokeDasharray={ringCirc}
-            strokeDashoffset={ringOffset}
-            style={{ transition: "stroke-dashoffset 0.5s ease-out", filter: `drop-shadow(0 0 4px ${color})` }}
+            cx={80} cy={80} r={radius} fill="none"
+            stroke={color} strokeWidth={8} strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={dashOffset}
+            style={{ transition: "stroke-dashoffset 0.3s ease-out", filter: `drop-shadow(0 0 6px ${color})` }}
           />
         </svg>
+        {/* Center icon */}
         <div className="relative z-10 flex flex-col items-center">
-          <span style={{ fontSize: 28 }}>🌡️</span>
-          <span className="text-[9px] uppercase tracking-widest mt-0.5" style={{ color }}>COOLING</span>
+          <span style={{ fontSize: 42 }}>🔤</span>
+          <span className="text-[10px] uppercase tracking-widest mt-1" style={{ color }}>KNOWLEDGE</span>
+        </div>
+      </div>
+
+      {/* ── Scramble puzzle area ───────────────────────────────────────── */}
+      <div className="w-full flex flex-col items-center gap-3 px-2">
+
+        {/* Prompt label */}
+        <div className="text-[10px] uppercase tracking-widest text-slate-500 text-center">
+          Unscramble the AI term
+        </div>
+
+        {/* Answer slots */}
+        <div
+          className={shake ? "knowledge-shake" : ""}
+          style={{ display: "flex", gap: 6, justifyContent: "center" }}
+        >
+          {selected.map((scrambledIdx, slotIdx) => {
+            const letter = scrambledIdx !== null ? scrambled[scrambledIdx] : null;
+            const slotColor =
+              feedback === "correct" ? "#4ade80" :
+              feedback === "wrong" ? "#f87171" :
+              letter ? color : "rgba(167,139,250,0.15)";
+            return (
+              <button
+                key={slotIdx}
+                id={`knowledge-slot-${slotIdx}`}
+                type="button"
+                onPointerDown={() => handleSlotTap(slotIdx)}
+                style={{
+                  width: 40,
+                  height: 48,
+                  borderRadius: 8,
+                  border: `2px solid ${slotColor}`,
+                  background: letter ? `${slotColor}20` : "rgba(15,23,42,0.7)",
+                  color: letter ? slotColor : "transparent",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 20,
+                  fontWeight: 900,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: letter ? "pointer" : "default",
+                  transition: "all 0.15s ease",
+                  boxShadow: letter ? `0 0 10px ${slotColor}40` : "none",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                {letter ?? ""}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Explanation banner */}
+        {showExplanation && (
+          <div
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 10,
+              background: "rgba(74,222,128,0.1)",
+              border: "1px solid rgba(74,222,128,0.35)",
+              textAlign: "center",
+            }}
+          >
+            <div className="text-sm font-black" style={{ color: "#4ade80" }}>
+              ✓ {currentTerm.word}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              {currentTerm.explanation}
+            </div>
+          </div>
+        )}
+
+        {/* Wrong answer flash */}
+        {feedback === "wrong" && !showExplanation && (
+          <div
+            style={{
+              width: "100%",
+              padding: "6px 12px",
+              borderRadius: 10,
+              background: "rgba(248,113,113,0.1)",
+              border: "1px solid rgba(248,113,113,0.3)",
+              textAlign: "center",
+            }}
+          >
+            <div className="text-xs font-bold text-red-400 uppercase tracking-widest">✗ Try again</div>
+          </div>
+        )}
+
+        {/* Scrambled letter tiles */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
+          {scrambled.map((letter, scrambledIdx) => {
+            const isUsed = selected.includes(scrambledIdx);
+            return (
+              <button
+                key={scrambledIdx}
+                id={`knowledge-letter-${scrambledIdx}`}
+                type="button"
+                onPointerDown={() => handleLetterTap(scrambledIdx)}
+                disabled={isUsed || feedback !== null}
+                style={{
+                  width: 40,
+                  height: 48,
+                  borderRadius: 8,
+                  border: `2px solid ${isUsed ? "rgba(167,139,250,0.15)" : `${color}80`}`,
+                  background: isUsed ? "rgba(15,23,42,0.4)" : `${color}15`,
+                  color: isUsed ? "transparent" : color,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 20,
+                  fontWeight: 900,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: isUsed ? "default" : "pointer",
+                  transition: "all 0.12s ease",
+                  boxShadow: isUsed ? "none" : `0 0 8px ${color}30`,
+                  WebkitTapHighlightColor: "transparent",
+                  opacity: isUsed ? 0.25 : 1,
+                }}
+              >
+                {isUsed ? "" : letter}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Progress bar */}
       <div className="w-full px-2">
         <div className="mb-1 flex justify-between text-[10px] uppercase tracking-widest text-slate-500">
-          <span>Coolant</span>
+          <span>Knowledge Base</span>
           <span>{progress} / 100%</span>
         </div>
         <div className="relative h-3 overflow-hidden rounded-full bg-slate-800">
@@ -1572,9 +1467,9 @@ function CoolingGame({ temperature, progress, status, score, onTick }: CoolingGa
             className="absolute inset-y-0 left-0 rounded-full"
             style={{
               width: `${progress}%`,
-              background: `linear-gradient(90deg, #0c4a6e, ${color})`,
+              background: `linear-gradient(90deg, #4c1d95, ${color})`,
               boxShadow: `0 0 8px ${color}80`,
-              transition: "width 0.5s ease-out",
+              transition: "width 0.3s ease-out",
             }}
           />
         </div>
@@ -1590,10 +1485,9 @@ interface RoleDevPanelProps {
   progress: number;
   status: string;
   actions: ReturnType<typeof useFactoryStore.useActions>;
-  coolingTemp: number;
 }
 
-function RoleDevPanel({ role, progress, status, actions, coolingTemp }: RoleDevPanelProps) {
+function RoleDevPanel({ role, progress, status, actions }: RoleDevPanelProps) {
   const color = ROLE_COLORS[role];
   const amt = GAME_CONFIG.devIncrementAmount;
 
@@ -1649,7 +1543,7 @@ function RoleDevPanel({ role, progress, status, actions, coolingTemp }: RoleDevP
             style={{ background: `${color}25`, border: `2px solid ${color}60`, color }}
             onClick={() => actions.devIncrementSecurity({ amount: amt })}
           >
-            ZIP<br /><span className="text-xs font-normal">+{amt}%</span>
+            AI<br /><span className="text-xs font-normal">+{amt}%</span>
           </button>
           <button
             type="button"
@@ -1657,7 +1551,7 @@ function RoleDevPanel({ role, progress, status, actions, coolingTemp }: RoleDevP
             style={{ background: `${color}25`, border: `2px solid ${color}60`, color }}
             onClick={() => actions.devIncrementSecurity({ amount: amt })}
           >
-            ZAP<br /><span className="text-xs font-normal">+{amt}%</span>
+            ML<br /><span className="text-xs font-normal">+{amt}%</span>
           </button>
         </div>
       )}
@@ -1675,17 +1569,218 @@ function RoleDevPanel({ role, progress, status, actions, coolingTemp }: RoleDevP
         </button>
       )}
 
-      {role === "cooling" && (
-        <CoolingDevPanel
-          temperature={coolingTemp}
-          onSet={(t) => actions.devSetCoolingTemp({ temperature: t })}
-        />
+      {role === "knowledge" && (
+        <button
+          type="button"
+          className="ctrl-button w-full rounded-2xl py-8 text-3xl font-black uppercase tracking-wider active:scale-95 transition-all"
+          style={{ background: "#a78bfa25", border: "2px solid #a78bfa60", color: "#a78bfa" }}
+          onClick={() => actions.devIncrementKnowledge({ amount: GAME_CONFIG.devIncrementAmount })}
+        >
+          🔤 SOLVE TERM
+          <br />
+          <span className="text-sm font-normal normal-case">+{GAME_CONFIG.devIncrementAmount}% per solve</span>
+        </button>
       )}
 
       <div className="text-xs text-slate-600 text-center">
         DEV TEST MODE · Real mini-game in next milestone
       </div>
     </div>
+  );
+}
+
+// ── Player Name Entry Screen ───────────────────────────────────────────────
+
+const NAME_KEY = "aifactory_player_name";
+
+function NameEntryScreen({ onConfirm }: { onConfirm: (name: string) => void }) {
+  const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Auto-focus the input on mount.
+    setTimeout(() => inputRef.current?.focus(), 120);
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Please enter your name to continue.");
+      return;
+    }
+    if (trimmed.length > 24) {
+      setError("Name must be 24 characters or fewer.");
+      return;
+    }
+    localStorage.setItem(NAME_KEY, trimmed);
+    onConfirm(trimmed);
+  }, [name, onConfirm]);
+
+  return (
+    <SurfaceViewport orientation="portrait" className="bg-[#050a14]">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          gap: 28,
+          padding: 28,
+          background:
+            "radial-gradient(ellipse at 50% 35%, rgba(56,189,248,0.07) 0%, #050a14 70%)",
+        }}
+      >
+        {/* Icon */}
+        <div
+          style={{
+            fontSize: 56,
+            animation: "aiCorePulse 2.5s ease-in-out infinite",
+            filter: "drop-shadow(0 0 16px rgba(56,189,248,0.45))",
+          }}
+        >
+          🏭
+        </div>
+
+        {/* Title */}
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+              color: "#38bdf8",
+              textShadow: "0 0 18px rgba(56,189,248,0.45)",
+            }}
+          >
+            AI FACTORY
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "#475569",
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+            }}
+          >
+            Enter your engineer name
+          </div>
+        </div>
+
+        {/* Name input card */}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 300,
+            background: "linear-gradient(145deg, rgba(13,24,37,0.97), rgba(15,32,53,0.99))",
+            border: "2px solid rgba(56,189,248,0.3)",
+            borderRadius: 18,
+            padding: "24px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+            boxShadow: "0 0 40px rgba(56,189,248,0.12), inset 0 1px 0 rgba(56,189,248,0.08)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "rgba(56,189,248,0.6)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            Engineer ID
+          </div>
+
+          <input
+            ref={inputRef}
+            id="player-name-input"
+            type="text"
+            value={name}
+            maxLength={24}
+            placeholder="Your name…"
+            autoComplete="nickname"
+            onChange={(e) => {
+              setName(e.target.value);
+              if (error) setError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSubmit();
+            }}
+            style={{
+              background: "rgba(5,10,20,0.85)",
+              border: error
+                ? "1.5px solid rgba(248,113,113,0.7)"
+                : "1.5px solid rgba(56,189,248,0.3)",
+              borderRadius: 10,
+              padding: "14px 14px",
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#e2e8f0",
+              outline: "none",
+              width: "100%",
+              boxSizing: "border-box",
+              letterSpacing: "0.02em",
+              caretColor: "#38bdf8",
+              transition: "border-color 0.2s ease",
+              WebkitAppearance: "none",
+            }}
+          />
+
+          {/* Error message */}
+          {error && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(248,113,113,0.9)",
+                letterSpacing: "0.06em",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* Confirm button */}
+          <button
+            id="player-name-confirm-btn"
+            type="button"
+            onClick={handleSubmit}
+            style={{
+              background: "linear-gradient(135deg, rgba(56,189,248,0.18), rgba(56,189,248,0.08))",
+              border: "1.5px solid rgba(56,189,248,0.5)",
+              borderRadius: 12,
+              padding: "14px 0",
+              fontSize: 14,
+              fontWeight: 800,
+              color: "#38bdf8",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              boxShadow: "0 0 20px rgba(56,189,248,0.1)",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            Join Factory →
+          </button>
+        </div>
+
+        <div
+          style={{
+            fontSize: 9,
+            color: "#1e293b",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+          }}
+        >
+          Your name is saved for next time
+        </div>
+      </div>
+    </SurfaceViewport>
   );
 }
 
@@ -1698,21 +1793,29 @@ export function ControllerView() {
   const actions = useFactoryStore.useActions();
   const requestedRef = useRef(false);
 
+  // Player name — local only, persisted to localStorage.
+  // Gating: requestRole() is not dispatched until the player has set a name.
+  const [playerName, setPlayerName] = useState<string | null>(
+    () => localStorage.getItem(NAME_KEY) ?? null,
+  );
+
   const myId = controller.controllerId;
   const myRole = myId ? (state.roleAssignments[myId] as PlayerRole | undefined) : undefined;
   const connected = controller.connectionStatus === "connected";
   const color = myRole ? ROLE_COLORS[myRole] : "#38bdf8";
 
-  // Auto-request role once connected.
+  // Auto-request role once connected AND name is confirmed.
   useEffect(() => {
-    if (connected && !myRole && !requestedRef.current) {
+    if (connected && playerName && !myRole && !requestedRef.current) {
       requestedRef.current = true;
       actions.requestRole();
     }
-  }, [connected, myRole, actions]);
+  }, [connected, playerName, myRole, actions]);
 
   // ── Connecting ──────────────────────────────────────────────────────────
   if (!connected) {
+    // If not yet connected, always show the connecting screen.
+    // (Name entry is shown after connection.)
     return (
       <SurfaceViewport orientation="portrait" className="bg-[#050a14]">
         <div
@@ -1799,6 +1902,17 @@ export function ControllerView() {
           )}
         </div>
       </SurfaceViewport>
+    );
+  }
+
+  // ── Name Entry (shown when connected but no name entered yet) ───────────
+  if (!playerName) {
+    return (
+      <NameEntryScreen
+        onConfirm={(name) => {
+          setPlayerName(name);
+        }}
+      />
     );
   }
 
@@ -1913,6 +2027,26 @@ export function ControllerView() {
               {ROLE_ICONS[myRole]}
             </div>
 
+            {/* Player name badge */}
+            {playerName && (
+              <div
+                style={{
+                  background: "rgba(56,189,248,0.08)",
+                  border: "1px solid rgba(56,189,248,0.25)",
+                  borderRadius: 8,
+                  padding: "4px 12px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#94a3b8",
+                  letterSpacing: "0.05em",
+                  alignSelf: "stretch",
+                  textAlign: "center",
+                }}
+              >
+                {playerName}
+              </div>
+            )}
+
             {/* Role label */}
             <div
               style={{
@@ -1996,6 +2130,18 @@ export function ControllerView() {
             {myId?.slice(0, 12)}
           </div>
         </div>
+      </SurfaceViewport>
+    );
+  }
+
+  // ── Sudden Death ──────────────────────────────────────────────────────────
+  if (state.phase === "suddenDeath") {
+    return (
+      <SurfaceViewport orientation="portrait" className="bg-[#050a14]">
+        <SuddenDeathController
+          state={state}
+          onAnswer={(logoId) => actions.answerQuiz({ logoId })}
+        />
       </SurfaceViewport>
     );
   }
@@ -2173,13 +2319,13 @@ export function ControllerView() {
                 score={(state.model as { score: number }).score}
                 onSolve={() => actions.solvePuzzle()}
               />
-            ) : myRole === "cooling" ? (
-              <CoolingGame
-                temperature={state.cooling.temperature}
+            ) : myRole === "knowledge" ? (
+              <KnowledgeTermScrambleGame
                 progress={deptState.progress}
                 status={deptState.status}
-                score={(state.cooling as { score: number }).score}
-                onTick={(centeredness) => actions.coolTick({ centeredness })}
+                score={(state.knowledge as { score: number }).score}
+                solvedCount={(state.knowledge as { solvedCount: number }).solvedCount}
+                onSolve={() => actions.solveKnowledgeTerm()}
               />
             ) : (
               <RoleDevPanel
@@ -2187,7 +2333,6 @@ export function ControllerView() {
                 progress={deptState.progress}
                 status={deptState.status}
                 actions={actions}
-                coolingTemp={state.cooling.temperature}
               />
             )}
           </div>
@@ -2201,6 +2346,8 @@ export function ControllerView() {
   const myProgress = (state[myRole] as { progress: number }).progress;
   const myScore = (state[myRole] as { score: number }).score;
   const resultColor = success ? "#4ade80" : "#f87171";
+  const isGoldenTicketWinner = myId != null && myId === state.suddenDeathWinner;
+  const mySuddenDeathScore = myId ? (state.suddenDeathScores[myId] ?? 0) : 0;
 
   return (
     <SurfaceViewport orientation="portrait" className="bg-[#050a14]">
@@ -2213,12 +2360,67 @@ export function ControllerView() {
           height: "100%",
           gap: 20,
           padding: 24,
-          background: success
-            ? "radial-gradient(ellipse at 50% 40%, rgba(74,222,128,0.07) 0%, #050a14 60%)"
-            : "radial-gradient(ellipse at 50% 40%, rgba(239,68,68,0.08) 0%, #050a14 60%)",
+          background: isGoldenTicketWinner
+            ? "radial-gradient(ellipse at 50% 40%, rgba(250,204,21,0.1) 0%, #050a14 60%)"
+            : success
+              ? "radial-gradient(ellipse at 50% 40%, rgba(74,222,128,0.07) 0%, #050a14 60%)"
+              : "radial-gradient(ellipse at 50% 40%, rgba(239,68,68,0.08) 0%, #050a14 60%)",
           overflow: "auto",
         }}
       >
+        {/* ── Golden Ticket winner badge ──────────────────────────────── */}
+        {isGoldenTicketWinner && (
+          <div
+            className="result-reveal"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 4,
+              padding: "12px 28px",
+              background: "linear-gradient(135deg, rgba(250,204,21,0.18), rgba(245,158,11,0.1))",
+              border: "2px solid rgba(250,204,21,0.6)",
+              borderRadius: 18,
+              boxShadow: "0 0 40px rgba(250,204,21,0.25)",
+            }}
+          >
+            <span style={{ fontSize: 36 }}>🎫</span>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 900,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "#facc15",
+                textShadow: "0 0 20px rgba(250,204,21,0.8)",
+                textAlign: "center",
+              }}
+            >
+              You got the Golden Ticket!
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(250,204,21,0.5)" }}>
+              {mySuddenDeathScore} correct answer{mySuddenDeathScore !== 1 ? "s" : ""}
+            </div>
+          </div>
+        )}
+        {!isGoldenTicketWinner && state.suddenDeathWinner && (
+          <div
+            className="result-reveal"
+            style={{
+              padding: "10px 22px",
+              background: "rgba(13,24,37,0.8)",
+              border: "1px solid rgba(250,204,21,0.2)",
+              borderRadius: 14,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 18 }}>🎫</div>
+            <div style={{ fontSize: 11, color: "rgba(250,204,21,0.5)", marginTop: 4 }}>
+              Quiz score: {mySuddenDeathScore} correct
+            </div>
+          </div>
+        )}
+
         {/* Result icon */}
         <div
           className="result-reveal"

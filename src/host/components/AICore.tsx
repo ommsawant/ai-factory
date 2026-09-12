@@ -8,7 +8,6 @@ import { type PlayerRole } from "../../game/domain/types";
 interface AICoreProps {
   health: number;
   allComplete: boolean;
-  temperature: number;
   statuses: Record<PlayerRole, string>;
 }
 
@@ -18,9 +17,8 @@ function healthColor(h: number) {
   return "#f87171";
 }
 
-export function AICore({ health, allComplete, temperature, statuses }: AICoreProps) {
+export function AICore({ health, allComplete, statuses }: AICoreProps) {
   const coreColor = allComplete ? "#4ade80" : healthColor(health);
-  const isHot = temperature > 90;
   const isCritical = health < 35;
 
   // SVG ring fill for health
@@ -203,20 +201,6 @@ export function AICore({ health, allComplete, temperature, statuses }: AICorePro
           >
             {allComplete ? "ONLINE" : "HEALTH"}
           </div>
-
-          {/* Hot indicator */}
-          {isHot && (
-            <div
-              style={{
-                fontSize: 10,
-                color: "#fb923c",
-                marginTop: 1,
-                animation: "warningPulse 0.8s ease-in-out infinite",
-              }}
-            >
-              🌡 HOT
-            </div>
-          )}
         </div>
       </div>
 
@@ -239,14 +223,14 @@ export function AICore({ health, allComplete, temperature, statuses }: AICorePro
           style={{
             marginTop: 2,
             fontSize: 9,
-            color: isHot ? "#fb923c" : "#475569",
+            color: "#475569",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
             fontFamily: "var(--font-mono)",
             transition: "color 0.4s ease",
           }}
         >
-          {temperature.toFixed(0)}°C · {completeDepts}/5 DEPTS
+          {completeDepts}/5 DEPTS
         </div>
       </div>
     </div>

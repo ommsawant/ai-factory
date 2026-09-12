@@ -2,10 +2,11 @@
  * Host screen — AI Factory (Expo Polish Edition).
  *
  * Phases:
- *  idle    → Attract screen with hex grid + QR code + ambient particles
- *  lobby   → Player roster; Start Game when 5/5 filled
- *  playing → AI Control Room: hub-and-spoke, SVG pipelines, overlays
- *  ended   → Deploy animation → Success / Failure result screen
+ *  idle        → Attract screen with hex grid + QR code + ambient particles
+ *  lobby       → Player roster; Start Game when 5/5 filled
+ *  playing     → AI Control Room: hub-and-spoke, SVG pipelines, overlays
+ *  suddenDeath → Golden Ticket — AI Logo Quiz (10 seconds, competitive)
+ *  ended       → Deploy animation → Success / Failure result screen
  */
 import { useAirJamHost, useHostTick } from "@air-jam/sdk";
 import { HostPreviewControllerWorkspace } from "@air-jam/sdk/preview";
@@ -22,9 +23,9 @@ import {
 import { GAME_CONFIG } from "../game/config/gameConfig";
 import { useFactoryStore, type FactoryState } from "../game/store/factoryStore";
 import { HexGrid } from "./components/HexGrid";
-import { AICore } from "./components/AICore";
-import { DeptPanel } from "./components/DeptPanel";
-import { PipelineOverlay } from "./components/PipelineOverlay";
+import { IsometricFactoryFloor } from "./components/IsometricFactoryFloor";
+import { SuddenDeathHost } from "./components/SuddenDeathHost";
+import { AiActivityLog } from "./components/AiActivityLog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -294,7 +295,7 @@ export function HostView() {
 
   // ── Per-role flash state ──────────────────────────────────────────────────
   const [flashes, setFlashes] = useState<Record<PlayerRole, boolean>>({
-    power: false, data: false, security: false, model: false, cooling: false,
+    power: false, data: false, security: false, model: false, knowledge: false,
   });
   const flashTimers = useRef<Partial<Record<PlayerRole, ReturnType<typeof setTimeout>>>>({});
 
@@ -311,14 +312,14 @@ export function HostView() {
   useFactoryStore.useHostActionListener(() => triggerFlash("data", 180),     { actionNames: ["sortData"] });
   useFactoryStore.useHostActionListener(() => triggerFlash("security", 180), { actionNames: ["zipZap"] });
   useFactoryStore.useHostActionListener(() => triggerFlash("model", 250),    { actionNames: ["solvePuzzle"] });
-  useFactoryStore.useHostActionListener(() => triggerFlash("cooling", 350),  { actionNames: ["coolTick"] });
+  useFactoryStore.useHostActionListener(() => triggerFlash("knowledge", 350),  { actionNames: ["solveKnowledgeTerm"] });
 
   // ── Host game loop ────────────────────────────────────────────────────────
   useHostTick({
     mode: "interval",
     intervalMs: 1000,
     onTick: () => {
-      if (state.phase === "playing") actions.tickTimer();
+      if (state.phase === "playing" || state.phase === "suddenDeath") actions.tickTimer();
     },
   });
 
@@ -326,13 +327,12 @@ export function HostView() {
   const [devOpen, setDevOpen] = useState(false);
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const allComplete = (["power", "data", "security", "model", "cooling"] as PlayerRole[]).every(
+  const allComplete = (["power", "data", "security", "model", "knowledge"] as PlayerRole[]).every(
     (r) => state[r].status === "complete",
   );
   const currentEvent = state.activeEvents[state.activeEvents.length - 1] ?? null;
   const timerDanger = state.timeRemaining < 30;
   const timerWarning = state.timeRemaining < 60 && state.timeRemaining >= 30;
-  const isHot = state.cooling.temperature > 90;
   const isCritical = state.factoryHealth < 35;
 
   const statuses = {
@@ -340,7 +340,7 @@ export function HostView() {
     data:     state.data.status,
     security: state.security.status,
     model:    state.model.status,
-    cooling:  state.cooling.status,
+    knowledge: state.knowledge.status,
   } as Record<PlayerRole, string>;
 
   // ── IDLE SCREEN ───────────────────────────────────────────────────────────
@@ -768,21 +768,6 @@ export function HostView() {
               />
             )}
 
-            {/* ── Heat vignette ────────────────────────────────────── */}
-            {isHot && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "radial-gradient(ellipse at center, transparent 50%, rgba(251,146,60,0.12) 100%)",
-                  animation: "heatVignette 1.4s ease-in-out infinite",
-                  pointerEvents: "none",
-                  zIndex: 4,
-                }}
-              />
-            )}
-
             {/* Hex grid bg */}
             <HexGrid opacity={0.6} />
 
@@ -899,145 +884,16 @@ export function HostView() {
                 zIndex: 2,
               }}
             >
-              {/* SVG pipeline layer */}
-              <PipelineOverlay flashes={flashes} statuses={statuses} />
-
-              {/* Power — top left */}
-              <div style={{ position: "absolute", top: "3%", left: "3%" }}>
-                <DeptPanel
-                  role="power"
-                  progress={state.power.progress}
-                  status={state.power.status}
-                  score={state.power.score}
-                  flashing={flashes.power}
-                />
-              </div>
-
-              {/* Data — top right */}
-              <div style={{ position: "absolute", top: "3%", right: "3%" }}>
-                <DeptPanel
-                  role="data"
-                  progress={state.data.progress}
-                  status={state.data.status}
-                  score={state.data.score}
-                  flashing={flashes.data}
-                />
-              </div>
-
-              {/* Security — bottom left */}
-              <div style={{ position: "absolute", bottom: "24%", left: "3%" }}>
-                <DeptPanel
-                  role="security"
-                  progress={state.security.progress}
-                  status={state.security.status}
-                  score={state.security.score}
-                  flashing={flashes.security}
-                />
-              </div>
-
-              {/* Model — bottom right */}
-              <div style={{ position: "absolute", bottom: "24%", right: "3%" }}>
-                <DeptPanel
-                  role="model"
-                  progress={state.model.progress}
-                  status={state.model.status}
-                  score={state.model.score}
-                  flashing={flashes.model}
-                />
-              </div>
-
-              {/* Cooling — bottom centre */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "3%",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                }}
-              >
-                <DeptPanel
-                  role="cooling"
-                  progress={state.cooling.progress}
-                  status={state.cooling.status}
-                  score={state.cooling.score}
-                  flashing={flashes.cooling}
-                  extra={
-                    <div
-                      style={{
-                        textAlign: "center",
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color:
-                          state.cooling.temperature <= GAME_CONFIG.coolingSafeMax
-                            ? "#34d399"
-                            : state.cooling.temperature > 90
-                              ? "#f87171"
-                              : "#fb923c",
-                        textShadow:
-                          state.cooling.temperature > 90
-                            ? "0 0 10px rgba(248,113,113,0.6)"
-                            : undefined,
-                        transition: "color 0.4s ease",
-                      }}
-                    >
-                      {state.cooling.temperature.toFixed(1)}°C
-                    </div>
-                  }
-                />
-              </div>
-
-              {/* AI Core — centre */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  zIndex: 10,
-                }}
-              >
-                <AICore
-                  health={state.factoryHealth}
-                  allComplete={allComplete}
-                  temperature={state.cooling.temperature}
-                  statuses={statuses}
-                />
-              </div>
-
-              {/* All-systems-go ticker */}
-              {allComplete && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    overflow: "hidden",
-                    height: 22,
-                    background: "rgba(74,222,128,0.08)",
-                    borderTop: "1px solid rgba(74,222,128,0.25)",
-                    zIndex: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      whiteSpace: "nowrap",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 9,
-                      fontWeight: 900,
-                      letterSpacing: "0.28em",
-                      color: "#4ade80",
-                      lineHeight: "22px",
-                      paddingLeft: "100%",
-                      animation: "allSystemsTicker 8s linear infinite",
-                    }}
-                  >
-                    ✓ ALL SYSTEMS OPERATIONAL · AI CORE READY FOR DEPLOYMENT · ✓ ALL SYSTEMS OPERATIONAL · AI CORE READY FOR DEPLOYMENT ·
-                  </div>
-                </div>
-              )}
+              <IsometricFactoryFloor
+                state={state}
+                statuses={statuses}
+                flashes={flashes}
+                allComplete={allComplete}
+              />
             </div>
+
+            {/* ── AI Activity Log ──────────────────────────────────── */}
+            <AiActivityLog />
 
             {/* ── Dev Panel ────────────────────────────────────────── */}
             <button
@@ -1122,24 +978,37 @@ export function HostView() {
                   <button
                     type="button"
                     className="ctrl-button"
-                    onClick={() =>
-                      actions.devSetCoolingTemp({
-                        temperature: Math.max(50, state.cooling.temperature - 5),
-                      })
-                    }
+                    onClick={() => actions.devIncrementKnowledge({ amount: GAME_CONFIG.devIncrementAmount })}
                     style={{
-                      background: "#38bdf815",
-                      border: "1px solid #38bdf840",
+                      background: "#a78bfa15",
+                      border: "1px solid #a78bfa40",
                       borderRadius: 6,
                       padding: "5px 8px",
                       fontSize: 10,
-                      color: "#38bdf8",
+                      color: "#a78bfa",
                       cursor: "pointer",
                       fontWeight: 700,
                       textAlign: "left",
                     }}
                   >
-                    🌡 Cool −5°C
+                    🔤 Knowl +{GAME_CONFIG.devIncrementAmount}%
+                  </button>
+                  <button
+                    type="button"
+                    className="ctrl-button"
+                    onClick={() => actions.devSkipToSuddenDeath()}
+                    style={{
+                      background: "rgba(250,204,21,0.15)",
+                      border: "1px solid rgba(250,204,21,0.3)",
+                      borderRadius: 6,
+                      padding: "5px 8px",
+                      fontSize: 10,
+                      color: "#facc15",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⏩ Skip to Quiz
                   </button>
                   <button
                     type="button"
@@ -1171,16 +1040,35 @@ export function HostView() {
     );
   }
 
+  // ── SUDDEN DEATH SCREEN — Golden Ticket Quiz ──────────────────────────────
+  if (state.phase === "suddenDeath") {
+    const playerLabels: Record<string, string> = {};
+    for (const p of host.players) playerLabels[p.id] = p.label ?? p.id.slice(0, 8);
+    return (
+      <>
+        <SurfaceViewport className="bg-[#050a14]">
+          <div style={{ position: "relative", width: "100%", height: "100%" }}>
+            <HexGrid opacity={0.4} />
+            <SuddenDeathHost state={state} playerLabels={playerLabels} />
+          </div>
+        </SurfaceViewport>
+        <HostPreviewControllerWorkspace />
+      </>
+    );
+  }
+
   // ── ENDED SCREEN ──────────────────────────────────────────────────────────
-  return <EndedScreen state={state} actions={actions} />;
+  return <EndedScreen host={host} state={state} actions={actions} />;
 }
 
 // ── Ended Screen ────────────────────────────────────────────────────────────
 
 function EndedScreen({
+  host,
   state,
   actions,
 }: {
+  host: { players: { id: string; label?: string }[] };
   state: FactoryState;
   actions: ReturnType<typeof useFactoryStore.useActions>;
 }) {
@@ -1334,6 +1222,70 @@ function EndedScreen({
         >
           <HexGrid opacity={0.4} />
           {success && <SuccessParticles />}
+
+          {/* ── Golden Ticket Winner Banner ──────────────────────────── */}
+          {state.suddenDeathWinner && (() => {
+            const winnerRole = state.roleAssignments[state.suddenDeathWinner];
+            const winnerColor = winnerRole ? ROLE_COLORS[winnerRole] : "#facc15";
+            const winnerLabel = host.players.find((p) => p.id === state.suddenDeathWinner)?.label
+              ?? state.suddenDeathWinner.slice(0, 8);
+            return (
+              <div
+                className="result-reveal"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  padding: "14px 36px",
+                  background:
+                    "linear-gradient(135deg, rgba(250,204,21,0.18), rgba(245,158,11,0.12))",
+                  border: "2px solid rgba(250,204,21,0.65)",
+                  borderRadius: 20,
+                  boxShadow:
+                    "0 0 60px rgba(250,204,21,0.25), inset 0 1px 0 rgba(250,204,21,0.15)",
+                  position: "relative",
+                  zIndex: 2,
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <span style={{ fontSize: 36 }}>🎫</span>
+                <div style={{ textAlign: "center" }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.26em",
+                      textTransform: "uppercase",
+                      color: "rgba(250,204,21,0.6)",
+                    }}
+                  >
+                    Golden Ticket Winner
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(1.4rem, 2.5vw, 2rem)",
+                      fontWeight: 900,
+                      color: winnerColor,
+                      textShadow: `0 0 30px ${winnerColor}80`,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {winnerRole ? ROLE_LABELS[winnerRole] : ""} — {winnerLabel}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "rgba(250,204,21,0.5)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {state.suddenDeathScores[state.suddenDeathWinner] ?? 0} correct answers
+                  </div>
+                </div>
+                <span style={{ fontSize: 36 }}>🎫</span>
+              </div>
+            );
+          })()}
 
           {/* Main result */}
           <div

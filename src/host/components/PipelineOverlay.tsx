@@ -16,7 +16,7 @@ const PATHS: { role: PlayerRole; d: string }[] = [
   { role: "data",     d: "M 87% 22% C 72% 30%, 60% 44%, 50% 50%" },
   { role: "security", d: "M 13% 70% C 28% 63%, 40% 57%, 50% 50%" },
   { role: "model",    d: "M 87% 70% C 72% 63%, 60% 57%, 50% 50%" },
-  { role: "cooling",  d: "M 50% 89% C 50% 76%, 50% 64%, 50% 50%" },
+  { role: "knowledge",  d: "M 50% 89% C 50% 76%, 50% 64%, 50% 50%" },
 ];
 
 export function PipelineOverlay({ flashes, statuses }: PipelineOverlayProps) {

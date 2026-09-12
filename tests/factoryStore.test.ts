@@ -24,7 +24,7 @@ describe("factoryStore - Data Engineer", () => {
     actions.requestRole(mockCtx("controller", "player2"), undefined); // data
     actions.requestRole(mockCtx("controller", "player3"), undefined); // security
     actions.requestRole(mockCtx("controller", "player4"), undefined); // model
-    actions.requestRole(mockCtx("controller", "player5"), undefined); // cooling
+    actions.requestRole(mockCtx("controller", "player5"), undefined); // knowledge
     
     // Start game
     actions.startGame(mockCtx("host", "host"), undefined);
@@ -74,5 +74,59 @@ describe("factoryStore - Data Engineer", () => {
     const state = useFactoryStore.getState();
     expect(state.data.progress).toBe(0);
     expect(state.data.score).toBe(0);
+  });
+});
+
+describe("factoryStore - Knowledge Engineer", () => {
+  beforeEach(() => {
+    // Reset store before each test using the host action
+    const actions = useFactoryStore.getState().actions;
+    actions.resetGame(mockCtx("host", "host"), undefined);
+  });
+
+  const setupPlayingPhase = () => {
+    const actions = useFactoryStore.getState().actions;
+    // Request roles to fill the lobby
+    actions.requestRole(mockCtx("controller", "player1"), undefined); // power
+    actions.requestRole(mockCtx("controller", "player2"), undefined); // data
+    actions.requestRole(mockCtx("controller", "player3"), undefined); // security
+    actions.requestRole(mockCtx("controller", "player4"), undefined); // model
+    actions.requestRole(mockCtx("controller", "player5"), undefined); // knowledge
+    
+    // Start game
+    actions.startGame(mockCtx("host", "host"), undefined);
+  };
+
+  it("should not allow knowledge solve when not in playing phase", () => {
+    const actions = useFactoryStore.getState().actions;
+    
+    // Store starts in 'idle'
+    actions.solveKnowledgeTerm(mockCtx("controller", "player5"), undefined);
+    
+    expect(useFactoryStore.getState().knowledge.progress).toBe(0);
+  });
+
+  it("should not allow non-knowledge role to solve term", () => {
+    setupPlayingPhase();
+    const actions = useFactoryStore.getState().actions;
+    
+    // player1 is power, player5 is knowledge
+    actions.solveKnowledgeTerm(mockCtx("controller", "player1"), undefined);
+    
+    // Progress should remain 0
+    expect(useFactoryStore.getState().knowledge.progress).toBe(0);
+  });
+
+  it("should increment knowledge progress and score on solve", () => {
+    setupPlayingPhase();
+    const actions = useFactoryStore.getState().actions;
+    
+    // player5 is knowledge engineer
+    actions.solveKnowledgeTerm(mockCtx("controller", "player5"), undefined);
+    
+    const state = useFactoryStore.getState();
+    expect(state.knowledge.progress).toBe(GAME_CONFIG.knowledgeIncrementPerSolve);
+    expect(state.knowledge.score).toBe(GAME_CONFIG.pointsPerTermSolve);
+    expect(state.teamScore).toBe(GAME_CONFIG.pointsPerTermSolve);
   });
 });

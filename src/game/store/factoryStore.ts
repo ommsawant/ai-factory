@@ -27,6 +27,7 @@ import type {
   PlayerRole,
 } from "../domain/types";
 import { ALL_ROLES } from "../domain/types";
+import { AI_LOGOS, QUIZ_LENGTH } from "../data/aiLogos";
 
 // ── Scripted factory events ───────────────────────────────────────────────
 // Events fire when timeRemaining matches these values.
@@ -62,9 +63,9 @@ const SCHEDULED_EVENTS: Record<number, ScheduledEvent> = {
     affectedRole: "model",
   },
   20: {
-    type: "critical_temperature",
-    message: "🔥 CRITICAL TEMPERATURE — AI Core overheating!",
-    affectedRole: "cooling",
+    type: "knowledge_drift",
+    message: "🔤 KNOWLEDGE DRIFT — AI terminology degrading!",
+    affectedRole: "knowledge",
   },
 };
 
@@ -96,14 +97,17 @@ export function createInitialFactoryState(): FactoryStateData {
     data: makeDept(),
     security: makeDept(),
     model: makeDept(),
-    cooling: {
+    knowledge: {
       ...makeDept(),
-      temperature: GAME_CONFIG.coolingTempStart,
+      solvedCount: 0,
     },
     factoryHealth: 0,
     teamScore: 0,
     activeEvents: [],
     finalResult: null,
+    suddenDeathScores: {},
+    suddenDeathWinner: null,
+    currentQuizIndex: 0,
   };
 }
 
@@ -149,23 +153,32 @@ export interface FactoryState extends FactoryStateData {
      */
     solvePuzzle: (ctx: AirJamActionContext, payload: undefined) => void;
 
+    // ── AI Knowledge mini-game: term scramble solve ──
+    /**
+     * Sent by the AI Knowledge Engineer controller when they correctly
+     * unscramble an AI term. Controller validates the answer locally and
+     * dispatches this action only on a correct solve.
+     */
+    solveKnowledgeTerm: (ctx: AirJamActionContext, payload: undefined) => void;
+
     // ── Dev/test: direct department increments ──
     devIncrementPower: (ctx: AirJamActionContext, payload: { amount: number }) => void;
     devIncrementData: (ctx: AirJamActionContext, payload: { amount: number }) => void;
     devIncrementSecurity: (ctx: AirJamActionContext, payload: { amount: number }) => void;
     devIncrementModel: (ctx: AirJamActionContext, payload: { amount: number }) => void;
-    devSetCoolingTemp: (ctx: AirJamActionContext, payload: { temperature: number }) => void;
-
-    // ── Cooling mini-game: gyroscope / touch tick ──
-    /**
-     * Sent by the Cooling Engineer controller periodically.
-     * `centeredness` is 0 (perfect centre) → 1 (edge of bounds).
-     * Host adjusts temperature and awards score accordingly.
-     */
-    coolTick: (ctx: AirJamActionContext, payload: { centeredness: number }) => void;
+    devIncrementKnowledge: (ctx: AirJamActionContext, payload: { amount: number }) => void;
+    devSkipToSuddenDeath: (ctx: AirJamActionContext, payload: undefined) => void;
 
     // ── Game lifecycle (timer tick, driven by host loop) ──
     tickTimer: (ctx: AirJamActionContext, payload: undefined) => void;
+
+    // ── Sudden Death: AI Logo Quiz ──
+    /**
+     * Sent by a controller when they tap a logo tile.
+     * `logoId` must match an `id` in AI_LOGOS.
+     * The first correct answer advances the quiz index and awards 1 point.
+     */
+    answerQuiz: (ctx: AirJamActionContext, payload: { logoId: string }) => void;
   };
 }
 
@@ -227,7 +240,7 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
         data: { ...state.data, status: "working" },
         security: { ...state.security, status: "working" },
         model: { ...state.model, status: "working" },
-        cooling: { ...state.cooling, status: "working" },
+        knowledge: { ...state.knowledge, status: "working" },
       }));
     },
 
@@ -342,7 +355,7 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
         if (assignedRole !== "security") {
           return rejectAirJamAction(
             "wrong_role",
-            "Only the Security Engineer may use the Zip-Zap firewall.",
+            "Only the Security Engineer may use the AI/ML firewall.",
           );
         }
       }
@@ -423,6 +436,48 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
       });
     },
 
+    // ── AI Knowledge mini-game ─────────────────────────────────────────────
+
+    solveKnowledgeTerm: ({ actorId, role }) => {
+      const current = get();
+      if (current.phase !== "playing") {
+        return rejectAirJamAction("not_playing", "Game is not in playing phase.");
+      }
+
+      // Guard: only the assigned AI Knowledge engineer (or host) may solve.
+      if (role === "controller") {
+        const assignedRole = actorId ? current.roleAssignments[actorId] : undefined;
+        if (assignedRole !== "knowledge") {
+          return rejectAirJamAction(
+            "wrong_role",
+            "Only the AI Knowledge Engineer may solve AI terms.",
+          );
+        }
+      }
+
+      set((state) => {
+        if (state.phase !== "playing") return state;
+        if (state.knowledge.progress >= 100) return state;
+
+        const newProgress = clamp(state.knowledge.progress + GAME_CONFIG.knowledgeIncrementPerSolve);
+        const bonus = GAME_CONFIG.pointsPerTermSolve;
+        const newKnowledge = {
+          ...state.knowledge,
+          progress: newProgress,
+          status: deriveStatus(newProgress),
+          score: state.knowledge.score + bonus,
+          solvedCount: state.knowledge.solvedCount + 1,
+        };
+        const factoryHealth = calculateFactoryHealth({ ...state, knowledge: newKnowledge });
+        return {
+          ...state,
+          knowledge: newKnowledge,
+          teamScore: state.teamScore + bonus,
+          factoryHealth,
+        };
+      });
+    },
+
     // ── Dev/test actions ──────────────────────────────────────────────────
 
     devIncrementPower: (_ctx, { amount }) => {
@@ -489,112 +544,38 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
       });
     },
 
-    devSetCoolingTemp: (_ctx, { temperature }) => {
+    devIncrementKnowledge: (_ctx, { amount }) => {
       set((state) => {
         if (state.phase !== "playing") return state;
-        const temp = Math.max(50, Math.min(120, temperature));
-        const inSafeZone =
-          temp >= GAME_CONFIG.coolingSafeMin && temp <= GAME_CONFIG.coolingSafeMax;
-
-        const safeCenter = (GAME_CONFIG.coolingSafeMin + GAME_CONFIG.coolingSafeMax) / 2;
-        const maxDeviation = GAME_CONFIG.coolingTempStart - GAME_CONFIG.coolingSafeMin;
-        const deviation = Math.abs(temp - safeCenter);
-        const coolingProgress = clamp(Math.round(100 - (deviation / maxDeviation) * 100));
-
-        const newCooling = {
-          ...state.cooling,
-          temperature: temp,
-          progress: coolingProgress,
-          status: (inSafeZone
-            ? "stable"
-            : temp > 80
-              ? "warning"
-              : "working") as DepartmentState["status"],
-          score: inSafeZone
-            ? state.cooling.score + GAME_CONFIG.pointsPerCoolingTick
-            : state.cooling.score,
+        const newProgress = clamp(state.knowledge.progress + amount);
+        const bonus = Math.round(amount * (GAME_CONFIG.pointsPerTermSolve / 10));
+        const newKnowledge = {
+          ...state.knowledge,
+          progress: newProgress,
+          status: deriveStatus(newProgress),
+          score: state.knowledge.score + bonus,
         };
-
-        const factoryHealth = calculateFactoryHealth({ ...state, cooling: newCooling });
-        return {
-          ...state,
-          cooling: newCooling,
-          teamScore: inSafeZone
-            ? state.teamScore + GAME_CONFIG.pointsPerCoolingTick
-            : state.teamScore,
-          factoryHealth,
-        };
+        const factoryHealth = calculateFactoryHealth({ ...state, knowledge: newKnowledge });
+        return { ...state, knowledge: newKnowledge, teamScore: state.teamScore + bonus, factoryHealth };
       });
     },
 
-    // ── Cooling mini-game ──────────────────────────────────────────────────
-
-    coolTick: ({ actorId, role }, { centeredness }) => {
-      const current = get();
-      if (current.phase !== "playing") {
-        return rejectAirJamAction("not_playing", "Game is not in playing phase.");
-      }
-
-      // Guard: only the assigned Cooling engineer (or host) may send ticks.
-      if (role === "controller") {
-        const assignedRole = actorId ? current.roleAssignments[actorId] : undefined;
-        if (assignedRole !== "cooling") {
-          return rejectAirJamAction(
-            "wrong_role",
-            "Only the Cooling Engineer may send cooling ticks.",
-          );
-        }
-      }
-
+    devSkipToSuddenDeath: () => {
       set((state) => {
         if (state.phase !== "playing") return state;
-
-        // Clamp centeredness 0–1 defensively (controller is untrusted network source).
-        const c = Math.min(1, Math.max(0, centeredness));
-
-        // Interpolate temperature change: perfectly centred = cool, fully off = heat.
-        // At c=0 we subtract coolingTempDecreasePerTick;
-        // at c=1 we add coolingTempIncreasePerTick.
-        const delta =
-          -GAME_CONFIG.coolingTempDecreasePerTick +
-          c * (GAME_CONFIG.coolingTempDecreasePerTick + GAME_CONFIG.coolingTempIncreasePerTick);
-
-        const rawTemp = state.cooling.temperature + delta;
-        const temp = Math.max(50, Math.min(120, rawTemp));
-
-        const inSafeZone =
-          temp >= GAME_CONFIG.coolingSafeMin && temp <= GAME_CONFIG.coolingSafeMax;
-        const isCentered = c <= GAME_CONFIG.coolingCenteredThreshold;
-        const scoreBonus = isCentered ? GAME_CONFIG.pointsPerCoolingTick : 0;
-
-        // Derive progress: full score when inside safe zone.
-        const safeCenter = (GAME_CONFIG.coolingSafeMin + GAME_CONFIG.coolingSafeMax) / 2;
-        const maxDeviation = GAME_CONFIG.coolingTempStart - GAME_CONFIG.coolingSafeMin;
-        const deviation = Math.abs(temp - safeCenter);
-        const coolingProgress = clamp(Math.round(100 - (deviation / maxDeviation) * 100));
-
-        const newStatus: DepartmentState["status"] = inSafeZone
-          ? "stable"
-          : temp > 85
-            ? "critical"
-            : temp > 78
-              ? "warning"
-              : "working";
-
-        const newCooling = {
-          ...state.cooling,
-          temperature: temp,
-          progress: coolingProgress,
-          status: newStatus,
-          score: state.cooling.score + scoreBonus,
-        };
-
-        const factoryHealth = calculateFactoryHealth({ ...state, cooling: newCooling });
+        const finalResult = evaluateFinalResult(
+          state,
+          GAME_CONFIG.factorySuccessThreshold,
+          GAME_CONFIG.criticalDeptMinimum,
+        );
         return {
           ...state,
-          cooling: newCooling,
-          teamScore: state.teamScore + scoreBonus,
-          factoryHealth,
+          timeRemaining: 10,
+          phase: "suddenDeath",
+          finalResult,
+          activeEvents: [],
+          suddenDeathScores: {},
+          currentQuizIndex: 0,
         };
       });
     },
@@ -605,18 +586,44 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
       if (role !== "host") return;
 
       set((state) => {
+        // ── Sudden Death tick ──────────────────────────────────────────────
+        if (state.phase === "suddenDeath") {
+          const newTime = state.timeRemaining - 1;
+          if (newTime <= 0) {
+            // Find the winner: controller with highest suddenDeath score.
+            const scores = state.suddenDeathScores;
+            let winner: string | null = null;
+            let best = -1;
+            for (const [id, score] of Object.entries(scores)) {
+              if (score > best) { best = score; winner = id; }
+            }
+            return { ...state, timeRemaining: 0, phase: "ended", suddenDeathWinner: winner };
+          }
+          return { ...state, timeRemaining: newTime };
+        }
+
+        // ── Normal playing tick ────────────────────────────────────────────
         if (state.phase !== "playing") return state;
 
         const newTime = state.timeRemaining - 1;
         const now = Date.now();
 
         if (newTime <= 0) {
+          // Co-op phase ends — kick off the 10-second Sudden Death.
           const finalResult = evaluateFinalResult(
             state,
             GAME_CONFIG.factorySuccessThreshold,
             GAME_CONFIG.criticalDeptMinimum,
           );
-          return { ...state, timeRemaining: 0, phase: "ended", finalResult, activeEvents: [] };
+          return {
+            ...state,
+            timeRemaining: 10,
+            phase: "suddenDeath",
+            finalResult,          // pre-compute; surfaced on ended screen
+            activeEvents: [],
+            suddenDeathScores: {},
+            currentQuizIndex: 0,
+          };
         }
 
         // Expire old events.
@@ -642,6 +649,41 @@ export const useFactoryStore = createAirJamStore<FactoryState>((set, get) => ({
         }
 
         return { ...state, timeRemaining: newTime, activeEvents: liveEvents };
+      });
+    },
+
+    // ── Sudden Death: AI Logo Quiz ─────────────────────────────────────────
+
+    answerQuiz: ({ actorId }, { logoId }) => {
+      // Guard: only valid during the suddenDeath phase.
+      const current = get();
+      if (current.phase !== "suddenDeath") {
+        return rejectAirJamAction("not_sudden_death", "Quiz is only active during sudden death.");
+      }
+      if (!actorId) return;
+
+      // Validate the answer against the current question.
+      const currentLogo = AI_LOGOS[current.currentQuizIndex];
+      if (!currentLogo) return; // quiz exhausted — shouldn't happen within 10s
+
+      if (logoId !== currentLogo.id) {
+        // Wrong answer — no state change, no penalty.
+        return;
+      }
+
+      // Correct! Award point and advance the question.
+      set((state) => {
+        if (state.phase !== "suddenDeath") return state;
+        const nextIndex = state.currentQuizIndex + 1;
+        return {
+          ...state,
+          suddenDeathScores: {
+            ...state.suddenDeathScores,
+            [actorId]: (state.suddenDeathScores[actorId] ?? 0) + 1,
+          },
+          // Advance question; clamp at QUIZ_LENGTH to avoid out-of-bounds.
+          currentQuizIndex: Math.min(nextIndex, QUIZ_LENGTH - 1),
+        };
       });
     },
   },

@@ -1,8 +1,8 @@
 /**
  * Air Jam app config for AI Factory — Build • Break • Survive.
  *
- * Declares runtime topology, controller sub-route, input schema (Cooling gyro),
- * and the semantic agent contract.
+ * Declares runtime topology, controller sub-route, input schema, and the
+ * semantic agent contract.
  * `env.vite(...)` resolves topology from `VITE_AIR_JAM_*` env vars.
  */
 import { createAirJamApp, env } from "@air-jam/sdk";

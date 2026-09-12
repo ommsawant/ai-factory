@@ -12,14 +12,14 @@ export type PlayerRole =
   | "data"
   | "security"
   | "model"
-  | "cooling";
+  | "knowledge";
 
 export const ALL_ROLES: PlayerRole[] = [
   "power",
   "data",
   "security",
   "model",
-  "cooling",
+  "knowledge",
 ];
 
 export const ROLE_LABELS: Record<PlayerRole, string> = {
@@ -27,7 +27,7 @@ export const ROLE_LABELS: Record<PlayerRole, string> = {
   data: "Data Engineer",
   security: "Security Engineer",
   model: "AI Model Engineer",
-  cooling: "Cooling Engineer",
+  knowledge: "AI Knowledge Engineer",
 };
 
 export const ROLE_ICONS: Record<PlayerRole, string> = {
@@ -35,7 +35,7 @@ export const ROLE_ICONS: Record<PlayerRole, string> = {
   data: "💾",
   security: "🛡",
   model: "🧠",
-  cooling: "🌡",
+  knowledge: "🔤",
 };
 
 export const ROLE_COLORS: Record<PlayerRole, string> = {
@@ -43,20 +43,20 @@ export const ROLE_COLORS: Record<PlayerRole, string> = {
   data: "#60a5fa",    // blue
   security: "#34d399", // emerald
   model: "#c084fc",   // purple
-  cooling: "#38bdf8", // sky
+  knowledge: "#a78bfa", // violet/indigo
 };
 
 export const ROLE_MINI_GAME: Record<PlayerRole, string> = {
   power: "Tap-Tap Power",
   data: "Data Cleaning",
-  security: "Zip-Zap Firewall",
+  security: "AI/ML Firewall",
   model: "AI Core Puzzle",
-  cooling: "Gyro Temperature Control",
+  knowledge: "AI Term Scramble",
 };
 
 // ── Game Phases ────────────────────────────────────────────────────────────
 
-export type GamePhase = "idle" | "lobby" | "playing" | "ended";
+export type GamePhase = "idle" | "lobby" | "playing" | "suddenDeath" | "ended";
 
 // ── Department Statuses ────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export type FactoryEventType =
   | "data_corruption"
   | "cyber_attack"
   | "model_drift"
-  | "critical_temperature";
+  | "knowledge_drift";
 
 export interface FactoryEvent {
   id: string;
@@ -115,9 +115,9 @@ export interface FactoryStateData {
   data: DepartmentState;
   security: DepartmentState;
   model: DepartmentState;
-  cooling: DepartmentState & {
-    /** Current temperature in °C */
-    temperature: number;
+  knowledge: DepartmentState & {
+    /** Number of AI terms successfully solved this game */
+    solvedCount: number;
   };
 
   /** Derived: average of all department progresses */
@@ -131,4 +131,21 @@ export interface FactoryStateData {
 
   /** Final success/failure result (set when phase === "ended") */
   finalResult: FinalResult;
+
+  // ── Sudden Death Golden Ticket ───────────────────────────────────────────
+
+  /**
+   * Per-player score for the Sudden Death AI Logo Quiz.
+   * Keyed by controllerId. Only populated during/after "suddenDeath" phase.
+   */
+  suddenDeathScores: Record<string, number>;
+
+  /** controllerId of the Sudden Death winner (set when phase transitions to "ended"). */
+  suddenDeathWinner: string | null;
+
+  /**
+   * Index into AI_LOGOS of the question currently shown on the host.
+   * Advances when any player correctly identifies the current logo.
+   */
+  currentQuizIndex: number;
 }

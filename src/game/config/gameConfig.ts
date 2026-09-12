@@ -14,26 +14,7 @@ export const GAME_CONFIG = {
   dataTarget: 100,
   securityTarget: 100,
   modelTarget: 100,
-
-  // --- Cooling safe range (°C) ---
-  coolingTempStart: 95,   // starting temperature
-  coolingSafeMin: 70,
-  coolingSafeMax: 75,
-
-  // --- Cooling Engineer gyroscope mini-game ---
-  /** Max tilt angle (degrees) that maps to the edge of the spirit-level bounds. */
-  coolingMaxTiltAngle: 30,
-  /** °C decrease per tick when bubble is perfectly centred (centeredness = 0). */
-  coolingTempDecreasePerTick: 1.5,
-  /** °C increase per tick when bubble is fully off-centre (centeredness = 1). */
-  coolingTempIncreasePerTick: 2.0,
-  /**
-   * Fraction of the bounds radius within which the bubble is considered
-   * "centred" and earns score.  0.25 = inner 25 % of the circle.
-   */
-  coolingCenteredThreshold: 0.25,
-  /** How often the controller syncs its centeredness to the host (ms). */
-  coolingTickThrottleMs: 500,
+  knowledgeTarget: 100,
 
   // --- Scoring ---
   pointsPerPowerTap: 10,
@@ -41,7 +22,7 @@ export const GAME_CONFIG = {
   pointsPerDataMissort: 0,  // incorrect sort (no penalty, just no gain)
   pointsPerZipZapHit: 15,
   pointsPerPuzzleStep: 50,  // awarded per completed puzzle round
-  pointsPerCoolingTick: 5,
+  pointsPerTermSolve: 30,   // awarded per correctly solved AI term
 
   // --- Factory health thresholds ---
   factorySuccessThreshold: 70, // factory health % required to win
@@ -76,6 +57,12 @@ export const GAME_CONFIG = {
   // --- AI Core Puzzle mini-game (AI Model Engineer) ---
   /** Progress awarded per completed puzzle round (5 solves to reach 100%). */
   modelIncrementPerSolve: 20,
+
+  // --- AI Term Scramble mini-game (AI Knowledge Engineer) ---
+  /** Progress awarded per correctly solved AI term (10 terms to reach 100%). */
+  knowledgeIncrementPerSolve: 10,
+  /** Brief ms to show the term explanation before advancing to next term. */
+  knowledgeExplanationDisplayMs: 1500,
 
   // --- Dev/test increments (used by the dev test interface) ---
   devIncrementAmount: 10,

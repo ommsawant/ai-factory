@@ -59,6 +59,12 @@ test.describe("AI Factory — full game lifecycle", () => {
       const page = await ctx.newPage();
       // The joinUrl already includes the ?room= param and points at /controller.
       await page.goto(joinUrl);
+
+      // Enter player name and confirm
+      await page.locator("#player-name-input").waitFor({ state: "visible", timeout: 10_000 });
+      await page.locator("#player-name-input").fill(`Engineer ${i + 1}`);
+      await page.locator("#player-name-confirm-btn").click();
+
       ctrlPages.push(page);
     }
   });
@@ -78,7 +84,7 @@ test.describe("AI Factory — full game lifecycle", () => {
     await expect(hostPage.getByText(/AI FACTORY/i).first()).toBeVisible({ timeout: 10_000 });
     // By the time this test runs, beforeAll has opened all 5 controllers,
     // so the host will already be in the lobby phase.
-    await expect(hostPage.getByText(/AI FACTORY LOBBY/i)).toBeVisible({ timeout: 15_000 });
+    await expect(hostPage.getByText(/AI FACTORY — LOBBY/i)).toBeVisible({ timeout: 15_000 });
   });
 
 
@@ -101,7 +107,7 @@ test.describe("AI Factory — full game lifecycle", () => {
 
   test("3. Host lobby shows 5/5 engineers and LAUNCH MISSION button", async () => {
     // Host transitions to lobby once first player joins.
-    await expect(hostPage.getByText(/AI FACTORY LOBBY/i)).toBeVisible({ timeout: 20_000 });
+    await expect(hostPage.getByText(/AI FACTORY — LOBBY/i)).toBeVisible({ timeout: 20_000 });
 
     // All 5 slots filled.
     await expect(hostPage.getByText(/5 \/ 5 Engineers Ready/i)).toBeVisible({ timeout: 25_000 });
@@ -121,7 +127,7 @@ test.describe("AI Factory — full game lifecycle", () => {
 
     // Playing screen header: "🏭 AI FACTORY" (same as idle, but now the control
     // room layout is shown — verify by the presence of the timer label).
-    await expect(hostPage.getByText(/^Time$/i)).toBeVisible({ timeout: 15_000 });
+    await expect(hostPage.getByText(/Time Remaining/i)).toBeVisible({ timeout: 15_000 });
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -229,29 +235,42 @@ test.describe("AI Factory — full game lifecycle", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Test 10 — Cooling mini-game
+  // Test 10 — Knowledge mini-game
   // ─────────────────────────────────────────────────────────────────────────
 
-  test("10. Cooling engineer: temperature readout and progress are visible", async () => {
-    const coolingPage = await findControllerByRole("Cooling Engineer", ctrlPages);
-    if (!coolingPage) { test.skip(); return; }
+  test("10. Knowledge engineer: scrambled term game and progress are visible", async () => {
+    const knowledgePage = await findControllerByRole("AI Knowledge Engineer", ctrlPages);
+    if (!knowledgePage) { test.skip(); return; }
 
-    await expect(coolingPage.getByText(/°C/i).first()).toBeVisible({ timeout: 10_000 });
-    await expect(coolingPage.getByText(/^Progress$/i).first()).toBeVisible();
+    await expect(knowledgePage.getByText(/Unscramble the AI term/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(knowledgePage.getByText(/^Progress$/i).first()).toBeVisible();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Test 11 — Host control room shows all 5 role panels
+  // Test 11 — Host Activity Log Updates
   // ─────────────────────────────────────────────────────────────────────────
 
-  test("11. Host control room shows department panels for all 5 roles", async () => {
+  test("11. Host AI Operations Log updates with activity", async () => {
+    // The log should be visible on the host screen
+    await expect(hostPage.getByText(/AI Operations Log/i).first()).toBeVisible({ timeout: 10_000 });
+    
+    // Wait for the Power Engineer's taps to appear in the log (from test 6)
+    // The log displays the role name in uppercase.
+    await expect(hostPage.getByText(/POWER/i).first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Test 12 — Host control room shows all 5 role panels
+  // ─────────────────────────────────────────────────────────────────────────
+
+  test("12. Host control room shows department panels for all 5 roles", async () => {
     // ROLE_LABELS are full names: "Power Engineer", "Data Engineer", etc.
     const roleLabels = [
       "Power Engineer",
       "Data Engineer",
       "Security Engineer",
       "AI Model Engineer",
-      "Cooling Engineer",
+      "AI Knowledge Engineer",
     ];
     for (const label of roleLabels) {
       await expect(
@@ -261,10 +280,10 @@ test.describe("AI Factory — full game lifecycle", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Test 12 — Host timer ticks down
+  // Test 13 — Host timer ticks down
   // ─────────────────────────────────────────────────────────────────────────
 
-  test("12. Host timer is ticking down during playing phase", async () => {
+  test("13. Host timer is ticking down during playing phase", async () => {
     // The "Time" label is an uppercase 9px div just above the timer value.
     // Grab the host body text and look for the MM:SS pattern directly via evaluate.
     const getTimerText = () =>
@@ -284,6 +303,42 @@ test.describe("AI Factory — full game lifecycle", () => {
 
     // Second reading should be strictly less (timer counted down).
     expect(t2! < t1!).toBe(true);
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+  // Test 14 — Sudden Death transition via Dev Panel
+  // ─────────────────────────────────────────────────────────────────────────
+
+  test("14. Host can skip to Sudden Death using dev panel", async () => {
+    // Open the dev panel first
+    await hostPage.getByText("🔧 DEV").click();
+
+    // Click the skip to quiz button on the host
+    await hostPage.getByText("⏩ Skip to Quiz").click();
+
+    // Host should show the Golden Ticket quiz screen
+    await expect(hostPage.getByText(/SUDDEN DEATH/i)).toBeVisible({ timeout: 10_000 });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Test 15 — Sudden Death gameplay & ended screen
+  // ─────────────────────────────────────────────────────────────────────────
+
+  test("15. Controller taps logo, timer ends, and winner is declared", async () => {
+    const p1 = ctrlPages[0];
+    
+    // The controller should see the 15 logo buttons
+    await expect(p1.locator(".logo-quiz-btn").first()).toBeVisible({ timeout: 10_000 });
+
+    // Tap all logos frantically to ensure we hit the correct shuffled one
+    const buttons = p1.locator(".logo-quiz-btn");
+    const count = await buttons.count();
+    for (let i = 0; i < count; i++) {
+      await buttons.nth(i).click();
+    }
+
+    // The host should eventually show the final result screen (since timeRemaining is set to 10 and ticks down,
+    // wait for 12 seconds to ensure game ends).
+    await expect(hostPage.getByText(/GOLDEN TICKET WINNER/i)).toBeVisible({ timeout: 15_000 });
   });
 });
 

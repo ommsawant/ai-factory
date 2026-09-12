@@ -1,20 +1,18 @@
 /**
  * Controller → host input schema (continuous input lane).
  *
- * Only the Cooling Engineer needs per-frame continuous data
- * (device orientation / gyroscope tilt).
+ * The gyroscope fields below are retained to preserve the existing Air Jam
+ * input registration shape, but are no longer actively consumed.
+ * The AI Knowledge Engineer (formerly Cooling Engineer) now uses discrete
+ * store actions (solveKnowledgeTerm) instead of a continuous input lane.
  *
- * All other roles use discrete store actions instead of the input lane.
- * See docs/state-lanes-cookbook.md for the decision rationale.
- *
- * If the device does not support orientation, the controller sends
- * { alpha: null, beta: null, gamma: null } and the host falls back to
- * the devSetCoolingTemp store action driven by touch controls.
+ * All roles use discrete store actions. See docs/state-lanes-cookbook.md
+ * for the decision rationale.
  */
 import { z } from "zod";
 
 export const gameInputSchema = z.object({
-  /** Device orientation — null when unsupported or permission denied. */
+  /** Device orientation — retained for schema compatibility; currently unused. */
   alpha: z.number().nullable(),
   beta: z.number().nullable(),
   gamma: z.number().nullable(),
